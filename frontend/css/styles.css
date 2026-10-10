@@ -20,7 +20,7 @@
   --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease: cubic-bezier(.2, .7, .2, 1);
-  --wrap: 1120px;
+  --wrap: 1280px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -183,7 +183,7 @@ label, legend { font-weight: 500; }
 .feed-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 36px; }
 .feed-head h1 { font: 700 clamp(1.8rem, 3.4vw, 2.4rem)/1.1 var(--serif); letter-spacing: -.02em; }
 .feed-head p { color: var(--mute); }
-.sortbar { display: flex; gap: 20px; justify-content: flex-end; margin: -10px 0 28px; font-size: 15px; }
+.sortbar { display: flex; align-items: center; gap: 20px; justify-content: flex-end; height: 43px; margin: 0 0 28px; font-size: 15px; }
 .sortbar a { color: var(--mute); text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; }
 .sortbar a:hover { color: var(--ink); }
 .sortbar a[aria-current="true"] { color: var(--ink); border-bottom-color: var(--ink); }
