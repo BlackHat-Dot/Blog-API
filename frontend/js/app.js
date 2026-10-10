@@ -11,6 +11,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const main = $('#main');
 
+  try { localStorage.removeItem('longhand.gemini_key'); } catch {}
+
   /* ------------------------------------------------------------------ helpers */
   const S = { me: null, cats: null, tags: null, likes: new Set(), marks: new Set() };
   let nav = 0;

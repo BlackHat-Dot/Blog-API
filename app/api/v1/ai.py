@@ -104,16 +104,47 @@ def _suggest_tones_fallback(topic: str) -> list[ToneSuggestion]:
         ]
 
 
+def _clean_json_text(raw_text: str) -> dict:
+    """Strips potential markdown code fences and parses JSON safely."""
+    t = raw_text.strip()
+    if t.startswith("```json"):
+        t = t[7:]
+    elif t.startswith("```"):
+        t = t[3:]
+    if t.endswith("```"):
+        t = t[:-3]
+    return json.loads(t.strip())
+
+
 def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, response_schema: type) -> dict:
-    """Invokes Google Gemini with candidate model fallback across 2.5, 2.0, and 1.5 flash."""
+    """Invokes Google Gemini by dynamically discovering supported models for the API key."""
     from google import genai
     from google.genai import types
 
     client = genai.Client(api_key=api_key)
-    candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-    last_exc = None
 
-    for model_name in candidate_models:
+    # 1. Dynamically query models available to this specific key/project
+    discovered_models = []
+    try:
+        for m in client.models.list():
+            actions = getattr(m, "supported_actions", None) or []
+            if not actions or "generateContent" in actions:
+                clean_name = m.name.replace("models/", "")
+                discovered_models.append(clean_name)
+    except Exception as list_err:
+        logger.warning("Dynamic client.models.list() call failed: %s", list_err)
+
+    # Sort discovered models: prefer flash, then pro, then others
+    flash_models = [m for m in discovered_models if "flash" in m.lower() and "image" not in m.lower() and "embed" not in m.lower()]
+    pro_models = [m for m in discovered_models if "pro" in m.lower() and "embed" not in m.lower()]
+    other_models = [m for m in discovered_models if m not in flash_models and m not in pro_models]
+
+    candidates = flash_models + pro_models + other_models
+    if not candidates:
+        candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-pro"]
+
+    last_exc = None
+    for model_name in candidates:
         try:
             response = client.models.generate_content(
                 model=model_name,
@@ -124,14 +155,26 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
                     response_schema=response_schema,
                 ),
             )
-            return json.loads(response.text)
+            return _clean_json_text(response.text)
         except Exception as exc:
             last_exc = exc
             err_str = str(exc).lower()
             if "not found" in err_str or "404" in err_str or "unsupported" in err_str:
-                logger.info("Model %s unavailable, trying next model: %s", model_name, exc)
+                logger.info("Model %s returned 404/unsupported, trying next model: %s", model_name, exc)
                 continue
-            # If it's an authentication error or quota or bad request, re-raise immediately
+            if "schema" in err_str:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=f"{prompt}\nReturn ONLY a valid JSON object matching the requested schema.",
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            response_mime_type="application/json",
+                        ),
+                    )
+                    return _clean_json_text(response.text)
+                except Exception:
+                    pass
             raise exc
 
     if last_exc:
