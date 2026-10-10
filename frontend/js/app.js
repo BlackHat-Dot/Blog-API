@@ -101,13 +101,14 @@
       <nav aria-label="Primary">
         <a href="#/" data-nav="home">Read</a>
         <a href="#/saved" data-nav="saved">Saved</a>
+        ${me ? `<a href="#/profile" data-nav="profile">Profile</a>` : ''}
       </nav>
       <div class="bar-end">${
         me
           ? `<a class="btn" href="#/write">Write</a>
              <details class="menu"><summary aria-label="Account menu">${esc(me.username)}</summary>
                <div class="menu-pop">
-                 <a href="${userHref(me.username)}">Your profile</a>
+                 <a href="#/profile">Your profile</a>
                  <button type="button" class="btn-quiet" style="text-align:left;padding:8px 12px;color:var(--ink);width:100%" data-act="edit-profile">Edit profile</button>
                  <a href="${userHref(me.username)}?tab=drafts">Your drafts</a>
                  <a href="#/saved">Saved posts</a>
@@ -119,7 +120,7 @@
   }
 
   function setActiveNav(parts) {
-    const key = !parts[0] ? 'home' : parts[0] === 'saved' ? 'saved' : '';
+    const key = !parts[0] ? 'home' : parts[0] === 'saved' ? 'saved' : (parts[0] === 'profile' || parts[0] === 'me' || (parts[0] === 'u' && S.me && parts[1] === S.me.username)) ? 'profile' : '';
     document.querySelectorAll('[data-nav]').forEach((a) => {
       if (a.dataset.nav === key) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
@@ -152,6 +153,7 @@
   /* ------------------------------------------------------------------ feed pieces */
   function entry(p, { lead = false, i = 0, byline = true } = {}) {
     const sum = p.summary || MD.excerpt(p.body, lead ? 260 : 200);
+    const mine = S.me && p.author && S.me.username === p.author.username;
     return `<article class="entry${lead ? ' lead' : ''}">
       <div class="len" style="--w:${lenPct(p.read_time)}%;--n:${Math.min(i, 8)}" aria-hidden="true"><i></i></div>
       <h2 class="entry-title"><a href="${postHref(p)}">${esc(p.title)}</a></h2>
@@ -163,6 +165,7 @@
         ${p.like_count ? `<span>${plural(p.like_count, 'like')}</span>` : ''}
         ${p.comment_count ? `<span>${plural(p.comment_count, 'comment')}</span>` : ''}
         ${p.state === 'draft' ? '<span class="flag">Draft</span>' : ''}
+        ${mine ? `<span class="own" style="margin-left:auto"><a href="#/edit/${p.id}">Edit</a><button class="btn-quiet" style="padding:0;margin-left:8px" data-act="delete-entry-post" data-id="${p.id}">Delete</button></span>` : ''}
       </p></article>`;
   }
 
@@ -834,6 +837,12 @@
       if (!(await confirmDialog({ title: 'Delete this post?', body: 'The post, its comments and likes are removed for good.', confirm: 'Delete post' }))) return;
       try { await API.deletePost(p.id); toast('Post deleted'); location.hash = '#/'; } catch (e) { toast(e.message, 'bad'); }
     },
+    async 'delete-entry-post'(t) {
+      const id = Number(t.dataset.id);
+      if (!id) return;
+      if (!(await confirmDialog({ title: 'Delete this post?', body: 'The post, its comments and likes are removed for good.', confirm: 'Delete post' }))) return;
+      try { await API.deletePost(id); toast('Post deleted'); route(); } catch (e) { toast(e.message, 'bad'); }
+    },
     reply(t) {
       if (!S.me) return needAuth('Sign in to reply.');
       document.querySelectorAll('.cm-slot').forEach((s) => { s.hidden = true; s.innerHTML = ''; });
@@ -949,6 +958,10 @@
       if (!a) await viewHome(q, run);
       else if (a === 'post') await viewPost(b, run);
       else if (a === 'u') await viewProfile(decodeURIComponent(b || ''), q, run);
+      else if (a === 'profile' || a === 'me') {
+        if (!S.me) return needAuth('Sign in to view your profile.');
+        await viewProfile(S.me.username, q, run);
+      }
       else if (a === 'write') await viewEditor(null, false, run);
       else if (a === 'edit') await viewEditor(b, true, run);
       else if (a === 'saved') await viewSaved(run);

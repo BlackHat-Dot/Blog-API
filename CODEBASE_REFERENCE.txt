@@ -2071,3 +2071,43 @@ def test_post_and_comment_lifecycle(client):
     auth_post_clean = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
     assert auth_post_clean["is_liked"] is False
     assert auth_post_clean["is_bookmarked"] is False
+
+    # Edit post as author
+    edit_res = client.put(
+        f"/api/v1/posts/{post_id}",
+        json={"title": "Updated Title for FastAPI Guide", "summary": "An updated summary"},
+        headers=headers,
+    )
+    assert edit_res.status_code == 200
+    assert edit_res.json()["title"] == "Updated Title for FastAPI Guide"
+    assert edit_res.json()["summary"] == "An updated summary"
+
+    # Register second user to test unauthorized edits and deletes
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "stranger@gmail.com", "username": "stranger", "password": "Password123!"},
+    )
+    login_stranger = client.post(
+        "/api/v1/auth/login",
+        json={"email": "stranger@gmail.com", "password": "Password123!"},
+    )
+    stranger_headers = {"Authorization": f"Bearer {login_stranger.json()['access_token']}"}
+
+    # Reject edit by non-author
+    unauth_edit = client.put(
+        f"/api/v1/posts/{post_id}",
+        json={"title": "Hacked Title that should fail"},
+        headers=stranger_headers,
+    )
+    assert unauth_edit.status_code == 403
+
+    # Reject delete by non-author
+    unauth_delete = client.delete(f"/api/v1/posts/{post_id}", headers=stranger_headers)
+    assert unauth_delete.status_code == 403
+
+    # Delete post as author
+    del_post_res = client.delete(f"/api/v1/posts/{post_id}", headers=headers)
+    assert del_post_res.status_code == 204
+
+    # Verify post is deleted
+    assert client.get(f"/api/v1/posts/{post_id}").status_code == 404

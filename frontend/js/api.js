@@ -13,9 +13,21 @@
     }
   }
 
+  let _memToken = null;
   const token = {
-    get() { try { return localStorage.getItem(KEY); } catch { return null; } },
-    set(t) { try { t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY); } catch { /* storage blocked */ } },
+    get() {
+      try {
+        const t = localStorage.getItem(KEY);
+        if (t) return t;
+      } catch { /* storage blocked */ }
+      return _memToken;
+    },
+    set(t) {
+      _memToken = t;
+      try {
+        t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY);
+      } catch { /* storage blocked */ }
+    },
   };
 
   function detailText(d) {
