@@ -107,6 +107,19 @@
     .splash-line.is-dot { opacity: 1; transform: scale(1); }
     .splash-line.is-on { width: 18px; border-radius: 2px; }
 
+    /* The "why", said once in the middle after the posts land: short notes vs long reads */
+    .splash-note {
+      position: absolute; left: 50%; top: calc(50% + clamp(3.4rem, 10vw, 4.8rem));
+      margin: 0; z-index: 1; pointer-events: none;
+      display: flex; flex-direction: column; align-items: center; gap: .35rem;
+      font: italic 400 clamp(.95rem, 2.2vw, 1.2rem)/1.35 var(--serif);
+      color: var(--ink-2); text-align: center; white-space: nowrap;
+      opacity: 0; filter: blur(6px); transform: translate(-50%, .45em);
+      transition: opacity 1s var(--ease), filter 1s var(--ease), transform 1s var(--ease);
+    }
+    .splash-note span:last-child { color: var(--accent); }
+    .splash-note.on { opacity: 1; filter: blur(0); transform: translate(-50%, 0); }
+
     .splash-flight { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
     #splashFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
 
@@ -125,7 +138,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       .splash-flight, #splashFx { display: none; }
-      .splash-word, .seg, .splash-line, #splash, .stack .ch { transition: none; }
+      .splash-word, .seg, .splash-line, #splash, .stack .ch, .splash-note { transition: none; }
       .splash-word.go .ch.intro, .splash-word.wave .tail .ch.intro { animation: none; }
     }
   </style>
@@ -138,6 +151,7 @@
           <span class="seg seg-clip" id="segA"></span><span class="seg" id="segO"></span><span class="seg seg-clip" id="segB"></span><span class="tail" id="splashTail"></span><span class="splash-line" id="splashLine"></span>
         </div>
       </div>
+      <p class="splash-note" id="splashNote" aria-hidden="true"><span>Quick notes are everywhere.</span><span>Long reads are where the thinking lives.</span></p>
       <div class="splash-flight" id="splashFlight"></div>
     </div>
     <canvas id="splashFx"></canvas>
@@ -161,7 +175,7 @@
 
       const main = $('main'), word = $('splashWord'), phys = $('splashPhys');
       const segA = $('segA'), segO = $('segO'), segB = $('segB'), tail = $('splashTail');
-      const line = $('splashLine'), flight = $('splashFlight'), cv = $('splashFx');
+      const line = $('splashLine'), flight = $('splashFlight'), cv = $('splashFx'), note = $('splashNote');
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       // Plays on every page load, including refresh.
@@ -390,6 +404,7 @@
         stains.push({ x: hx, y: hy, r: rand(14, 24) + s.i * 2, a: .07, life: 3800, age: 0 });
         hitPts.push({ x: hx, y: hy });
         hits++;
+        if (hits === COUNT) at(clock + 380, () => note.classList.add('on')); // the why, once the last post has landed
         tensionTarget = Math.pow(hits / COUNT, 2);
         energy = Math.min(1, energy + .2);
       }
@@ -611,6 +626,7 @@
             seg.classList.add('is-long');
           });
           line.classList.add('is-dot', 'is-on');
+          note.classList.add('on');
           setTimeout(() => { sequenceDone = true; finish(); }, 600);
           return;
         }
