@@ -7,8 +7,8 @@ from app.schemas.category import CategoryRead
 
 
 class PostBase(BaseModel):
-    title: str = Field(..., min_length=5, max_length=255)
-    summary: str | None = Field(None, max_length=1000)
+    title: str = Field(..., min_length=5, max_length=55)
+    summary: str | None = Field(None, max_length=110)
     body: str = Field(..., min_length=20, max_length=100000)
     category_id: int | None = None
     tags: list[str] = Field(default_factory=list, max_length=15)
@@ -31,8 +31,8 @@ class PostCreate(PostBase):
 
 
 class PostUpdate(BaseModel):
-    title: str | None = Field(None, min_length=5, max_length=255)
-    summary: str | None = Field(None, max_length=1000)
+    title: str | None = Field(None, min_length=5, max_length=55)
+    summary: str | None = Field(None, max_length=110)
     body: str | None = Field(None, min_length=20, max_length=100000)
     category_id: int | None = None
     tags: list[str] | None = Field(None, max_length=15)

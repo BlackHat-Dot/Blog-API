@@ -609,9 +609,9 @@
           </div>
         </div>
         <label class="sr" for="ed-title">Title</label>
-        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="255" autocomplete="off">
+        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="55" autocomplete="off">
         <label class="sr" for="ed-sum">Summary</label>
-        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="1000" placeholder="A sentence or two that sets up the post (optional)"></textarea>
+        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="110" placeholder="A sentence or two that sets up the post (optional)"></textarea>
         <div class="ed-tabs" role="tablist" aria-label="Editor mode">
           <button type="button" role="tab" id="tab-write" aria-selected="true" aria-controls="ed-body" data-tab="write">Write</button>
           <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="ed-preview" data-tab="preview">Preview</button>
@@ -1039,8 +1039,8 @@
         err.textContent = '';
         addTag(tagIn.value);
         if (E.title.trim().length < 5) { err.textContent = 'Give the post a title of at least 5 characters.'; title.focus(); return; }
-        if (E.title.trim().length > 255) { err.textContent = 'Title must be 255 characters or less.'; title.focus(); return; }
-        if (E.summary && E.summary.trim().length > 1000) { err.textContent = 'Description/summary must be 1,000 characters or less.'; sum.focus(); return; }
+        if (E.title.trim().length > 55) { err.textContent = 'Title must be 55 characters or less.'; title.focus(); return; }
+        if (E.summary && E.summary.trim().length > 110) { err.textContent = 'Description/summary must be 110 characters or less.'; sum.focus(); return; }
         if (E.body.trim().length < 20) { err.textContent = 'Write at least 20 characters in the body.'; body.focus(); return; }
         if (E.body.length > 100000) { err.textContent = 'Body must be 100,000 characters or less.'; body.focus(); return; }
         if (E.tags.length > 15) { err.textContent = 'A post can have at most 15 tags.'; tagIn.focus(); return; }

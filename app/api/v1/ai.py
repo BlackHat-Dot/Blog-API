@@ -200,14 +200,17 @@ def _generate_post_fallback(prompt: str, tone: str, existing_categories: list[st
     """Substantive structured fallback generator used during automated test suites."""
     clean_prompt = prompt.strip().rstrip(".")
     title_words = [w.capitalize() for w in clean_prompt.split()]
-    title = f"{' '.join(title_words[:6])}: In-Depth Exploration & Principles"
+    title = f"{' '.join(title_words[:4])}: A Deep Dive"
+    if len(title) > 55:
+        title = title[:55].rstrip()
     if len(title) < 15:
-        title = f"Exploring {clean_prompt.capitalize()}: A Deep Dive"
+        title = f"Exploring {clean_prompt.capitalize()}"[:55]
 
     summary = (
-        f"A thorough, insightful examination of {clean_prompt.lower()}, "
-        f"exploring core principles, practical nuances, and deeper context written in a {tone.lower()} tone."
+        f"A thorough, insightful examination of {clean_prompt.lower()} written in a {tone.lower()} tone."
     )
+    if len(summary) > 110:
+        summary = summary[:107].rstrip() + "..."
 
     category = "General"
     t_lower = f"{prompt} {tone}".lower()
@@ -375,8 +378,8 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
    - Paragraphs with natural cadence, bulleted takeaways where helpful, and blockquotes (> quote) for focal points.
    - Include code snippets, lists, or tables ONLY when the subject matter naturally calls for them.
 5. STRICT FIELD LENGTH LIMITS (MANDATORY):
-   - Title: Engaging headline (5 to 255 characters).
-   - Summary: Standfirst hooking the reader (10 to 1,000 characters).
+   - Title: Engaging headline (min 4 words, 5 to 55 characters maximum).
+   - Summary: Brief standfirst/description hooking the reader (min 4 words, 10 to 110 characters maximum).
    - Category: Choose from [{categories_str}] or suggest a fitting name matching the domain (1 to 50 characters).
    - Tags: 3 to 6 lowercase tags, each 1 to 30 characters maximum (max 15 tags total).
    - Body: In-depth markdown article (50 to 100,000 characters).
@@ -387,9 +390,9 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
 
             # Defensive sanitization ensuring limits are never breached
             if "title" in data and isinstance(data["title"], str):
-                data["title"] = data["title"].strip()[:255]
+                data["title"] = data["title"].strip()[:55]
             if "summary" in data and isinstance(data["summary"], str):
-                data["summary"] = data["summary"].strip()[:1000]
+                data["summary"] = data["summary"].strip()[:110]
             if "body" in data and isinstance(data["body"], str):
                 data["body"] = data["body"][:100000]
             if "category" in data and isinstance(data["category"], str):

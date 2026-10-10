@@ -436,19 +436,31 @@ def test_ai_tones_and_post_generation(client):
     long_cat = client.post("/api/v1/categories", json={"name": "C" * 51}, headers=headers)
     assert long_cat.status_code == 422
 
-    # 3. Post Summary / Description > 1000 chars -> 422
+    # 3. Post Title > 55 chars -> 422
+    bad_title = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "T" * 56,
+            "summary": "Short valid summary",
+            "body": "This is a valid body with sufficient characters for testing.",
+        },
+        headers=headers,
+    )
+    assert bad_title.status_code == 422
+
+    # 4. Post Summary / Description > 110 chars -> 422
     bad_sum = client.post(
         "/api/v1/posts",
         json={
-            "title": "Valid Post Title Here",
-            "summary": "S" * 1001,
+            "title": "Valid Post Title",
+            "summary": "S" * 111,
             "body": "This is a valid body with sufficient characters for testing.",
         },
         headers=headers,
     )
     assert bad_sum.status_code == 422
 
-    # 4. Post Body > 100,000 chars -> 422
+    # 5. Post Body > 100,000 chars -> 422
     bad_body = client.post(
         "/api/v1/posts",
         json={

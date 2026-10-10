@@ -25,8 +25,8 @@ class GeneratePostRequest(BaseModel):
 
 
 class GeneratedPostResponse(BaseModel):
-    title: str = Field(..., min_length=5, max_length=255)
-    summary: str = Field(..., min_length=10, max_length=1000)
+    title: str = Field(..., min_length=5, max_length=55)
+    summary: str = Field(..., min_length=10, max_length=110)
     body: str = Field(..., min_length=50, max_length=100000)
     category: str | None = Field(None, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=15)

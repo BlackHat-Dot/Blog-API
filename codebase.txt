@@ -3219,14 +3219,17 @@ def _generate_post_fallback(prompt: str, tone: str, existing_categories: list[st
     """Substantive structured fallback generator used during automated test suites."""
     clean_prompt = prompt.strip().rstrip(".")
     title_words = [w.capitalize() for w in clean_prompt.split()]
-    title = f"{' '.join(title_words[:6])}: In-Depth Exploration & Principles"
+    title = f"{' '.join(title_words[:4])}: A Deep Dive"
+    if len(title) > 55:
+        title = title[:55].rstrip()
     if len(title) < 15:
-        title = f"Exploring {clean_prompt.capitalize()}: A Deep Dive"
+        title = f"Exploring {clean_prompt.capitalize()}"[:55]
 
     summary = (
-        f"A thorough, insightful examination of {clean_prompt.lower()}, "
-        f"exploring core principles, practical nuances, and deeper context written in a {tone.lower()} tone."
+        f"A thorough, insightful examination of {clean_prompt.lower()} written in a {tone.lower()} tone."
     )
+    if len(summary) > 110:
+        summary = summary[:107].rstrip() + "..."
 
     category = "General"
     t_lower = f"{prompt} {tone}".lower()
@@ -3394,8 +3397,8 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
    - Paragraphs with natural cadence, bulleted takeaways where helpful, and blockquotes (> quote) for focal points.
    - Include code snippets, lists, or tables ONLY when the subject matter naturally calls for them.
 5. STRICT FIELD LENGTH LIMITS (MANDATORY):
-   - Title: Engaging headline (5 to 255 characters).
-   - Summary: Standfirst hooking the reader (10 to 1,000 characters).
+   - Title: Engaging headline (min 4 words, 5 to 55 characters maximum).
+   - Summary: Brief standfirst/description hooking the reader (min 4 words, 10 to 110 characters maximum).
    - Category: Choose from [{categories_str}] or suggest a fitting name matching the domain (1 to 50 characters).
    - Tags: 3 to 6 lowercase tags, each 1 to 30 characters maximum (max 15 tags total).
    - Body: In-depth markdown article (50 to 100,000 characters).
@@ -3406,9 +3409,9 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
 
             # Defensive sanitization ensuring limits are never breached
             if "title" in data and isinstance(data["title"], str):
-                data["title"] = data["title"].strip()[:255]
+                data["title"] = data["title"].strip()[:55]
             if "summary" in data and isinstance(data["summary"], str):
-                data["summary"] = data["summary"].strip()[:1000]
+                data["summary"] = data["summary"].strip()[:110]
             if "body" in data and isinstance(data["body"], str):
                 data["body"] = data["body"][:100000]
             if "category" in data and isinstance(data["category"], str):
@@ -4789,8 +4792,8 @@ class GeneratePostRequest(BaseModel):
 
 
 class GeneratedPostResponse(BaseModel):
-    title: str = Field(..., min_length=5, max_length=255)
-    summary: str = Field(..., min_length=10, max_length=1000)
+    title: str = Field(..., min_length=5, max_length=55)
+    summary: str = Field(..., min_length=10, max_length=110)
     body: str = Field(..., min_length=50, max_length=100000)
     category: str | None = Field(None, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=15)
@@ -4864,8 +4867,8 @@ from app.schemas.category import CategoryRead
 
 
 class PostBase(BaseModel):
-    title: str = Field(..., min_length=5, max_length=255)
-    summary: str | None = Field(None, max_length=1000)
+    title: str = Field(..., min_length=5, max_length=55)
+    summary: str | None = Field(None, max_length=110)
     body: str = Field(..., min_length=20, max_length=100000)
     category_id: int | None = None
     tags: list[str] = Field(default_factory=list, max_length=15)
@@ -4888,8 +4891,8 @@ class PostCreate(PostBase):
 
 
 class PostUpdate(BaseModel):
-    title: str | None = Field(None, min_length=5, max_length=255)
-    summary: str | None = Field(None, max_length=1000)
+    title: str | None = Field(None, min_length=5, max_length=55)
+    summary: str | None = Field(None, max_length=110)
     body: str | None = Field(None, min_length=20, max_length=100000)
     category_id: int | None = None
     tags: list[str] | None = Field(None, max_length=15)
@@ -6446,7 +6449,7 @@ __all__ = [
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,300..800;1,7..72,300..800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20261010_1">
+  <link rel="stylesheet" href="css/styles.css?v=20261010_2">
 </head>
 <body>
   <a class="skip" href="#main" data-skip>Skip to content</a>
@@ -6458,10 +6461,10 @@ __all__ = [
   <dialog id="dlg"></dialog>
 
   <noscript><p style="padding:24px">This site needs JavaScript to run.</p></noscript>
-  <script src="config.js?v=20261010_1"></script>
-  <script src="js/md.js?v=20261010_1"></script>
-  <script src="js/api.js?v=20261010_1"></script>
-  <script src="js/app.js?v=20261010_1"></script>
+  <script src="config.js?v=20261010_2"></script>
+  <script src="js/md.js?v=20261010_2"></script>
+  <script src="js/api.js?v=20261010_2"></script>
+  <script src="js/app.js?v=20261010_2"></script>
 </body>
 </html>
 
@@ -8464,9 +8467,9 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
           </div>
         </div>
         <label class="sr" for="ed-title">Title</label>
-        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="255" autocomplete="off">
+        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="55" autocomplete="off">
         <label class="sr" for="ed-sum">Summary</label>
-        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="1000" placeholder="A sentence or two that sets up the post (optional)"></textarea>
+        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="110" placeholder="A sentence or two that sets up the post (optional)"></textarea>
         <div class="ed-tabs" role="tablist" aria-label="Editor mode">
           <button type="button" role="tab" id="tab-write" aria-selected="true" aria-controls="ed-body" data-tab="write">Write</button>
           <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="ed-preview" data-tab="preview">Preview</button>
@@ -8894,8 +8897,8 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
         err.textContent = '';
         addTag(tagIn.value);
         if (E.title.trim().length < 5) { err.textContent = 'Give the post a title of at least 5 characters.'; title.focus(); return; }
-        if (E.title.trim().length > 255) { err.textContent = 'Title must be 255 characters or less.'; title.focus(); return; }
-        if (E.summary && E.summary.trim().length > 1000) { err.textContent = 'Description/summary must be 1,000 characters or less.'; sum.focus(); return; }
+        if (E.title.trim().length > 55) { err.textContent = 'Title must be 55 characters or less.'; title.focus(); return; }
+        if (E.summary && E.summary.trim().length > 110) { err.textContent = 'Description/summary must be 110 characters or less.'; sum.focus(); return; }
         if (E.body.trim().length < 20) { err.textContent = 'Write at least 20 characters in the body.'; body.focus(); return; }
         if (E.body.length > 100000) { err.textContent = 'Body must be 100,000 characters or less.'; body.focus(); return; }
         if (E.tags.length > 15) { err.textContent = 'A post can have at most 15 tags.'; tagIn.focus(); return; }
@@ -9834,19 +9837,31 @@ def test_ai_tones_and_post_generation(client):
     long_cat = client.post("/api/v1/categories", json={"name": "C" * 51}, headers=headers)
     assert long_cat.status_code == 422
 
-    # 3. Post Summary / Description > 1000 chars -> 422
+    # 3. Post Title > 55 chars -> 422
+    bad_title = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "T" * 56,
+            "summary": "Short valid summary",
+            "body": "This is a valid body with sufficient characters for testing.",
+        },
+        headers=headers,
+    )
+    assert bad_title.status_code == 422
+
+    # 4. Post Summary / Description > 110 chars -> 422
     bad_sum = client.post(
         "/api/v1/posts",
         json={
-            "title": "Valid Post Title Here",
-            "summary": "S" * 1001,
+            "title": "Valid Post Title",
+            "summary": "S" * 111,
             "body": "This is a valid body with sufficient characters for testing.",
         },
         headers=headers,
     )
     assert bad_sum.status_code == 422
 
-    # 4. Post Body > 100,000 chars -> 422
+    # 5. Post Body > 100,000 chars -> 422
     bad_body = client.post(
         "/api/v1/posts",
         json={
