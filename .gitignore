@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,18 +10,36 @@ venv/
 instance/
 .webassets-cache
 .python-version
+__pypackages__/
+
+# Environment & Secrets
 .env
 .env.*
 !.env.example
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+blog.db
+
+# Operating System
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editors & IDEs
 .idea/
 .vscode/
-*.sqlite3
-*.log
-*.pot
+*.swp
+*.swo
+*~
 *.pydevproject
-.python-version
-__pypackages__/
-celerybeat-schedule
+
+# Testing & Coverage
 htmlcov/
 .ipynb_checkpoints
 .mypy_cache/
@@ -31,8 +50,16 @@ htmlcov/
 coverage.xml
 .cache
 nosetests.xml
+
+# Packaging & Builds
 *.egg-info/
 .dist-info/
 .eggs/
 
+# Logs
+*.log
+*.pot
+celerybeat-schedule
+
+# Alembic
 alembic/versions/*.pyc
