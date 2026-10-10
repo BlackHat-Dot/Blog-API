@@ -412,6 +412,12 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
+  gap: 12px;
+}
+.ai-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .ai-title-wrap {
   display: flex;

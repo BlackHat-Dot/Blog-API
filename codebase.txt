@@ -6446,7 +6446,7 @@ __all__ = [
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,300..800;1,7..72,300..800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=20261010_1">
 </head>
 <body>
   <a class="skip" href="#main" data-skip>Skip to content</a>
@@ -6458,10 +6458,10 @@ __all__ = [
   <dialog id="dlg"></dialog>
 
   <noscript><p style="padding:24px">This site needs JavaScript to run.</p></noscript>
-  <script src="config.js"></script>
-  <script src="js/md.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
+  <script src="config.js?v=20261010_1"></script>
+  <script src="js/md.js?v=20261010_1"></script>
+  <script src="js/api.js?v=20261010_1"></script>
+  <script src="js/app.js?v=20261010_1"></script>
 </body>
 </html>
 
@@ -7545,6 +7545,12 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
+  gap: 12px;
+}
+.ai-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .ai-title-wrap {
   display: flex;
@@ -8419,7 +8425,13 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
                 <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
               </div>
             </div>
-            <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            <div class="ai-head-right">
+              <div class="ai-model-pill" id="ai-header-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-header-model-name">gemini-2.5-flash</span>
+              </div>
+              <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            </div>
           </div>
           <div class="ai-body" id="ai-body" hidden>
             <div class="ai-input-group">
@@ -8544,6 +8556,8 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
     const aiStatusText = $('#ai-status-text', f);
     const aiModelPill = $('#ai-model-pill', f);
     const aiModelName = $('#ai-model-name', f);
+    const aiHeaderModelPill = $('#ai-header-model-pill', f);
+    const aiHeaderModelName = $('#ai-header-model-name', f);
     const aiHeaderGemini = $('#ai-header-gemini', f);
     const aiTonesSection = $('#ai-tones-section', f);
     const aiTonesGrid = $('#ai-tones-grid', f);
@@ -8552,13 +8566,29 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
 
     let selectedTone = '';
 
+    const updateModelPills = (modelUsed) => {
+      if (!modelUsed) return;
+      const isFallback = modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock');
+      
+      // Update inline status row pill
+      aiModelName.textContent = modelUsed;
+      aiModelPill.hidden = false;
+      aiModelPill.classList.toggle('fallback', isFallback);
+
+      // Update header pill so it remains visible even when collapsed
+      if (aiHeaderModelPill && aiHeaderModelName) {
+        aiHeaderModelName.textContent = modelUsed;
+        aiHeaderModelPill.hidden = false;
+        aiHeaderModelPill.classList.toggle('fallback', isFallback);
+      }
+    };
+
     const showAiLoading = (message) => {
       aiStatusRow.hidden = false;
       aiStatusGemini.hidden = false;
       aiStatusGemini.classList.add('spinning');
       if (aiHeaderGemini) aiHeaderGemini.classList.add('spinning');
       aiStatusText.textContent = message;
-      aiModelPill.hidden = true;
     };
 
     const showAiSuccess = (message, modelUsed) => {
@@ -8568,13 +8598,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
       aiStatusGemini.hidden = false;
       aiStatusText.textContent = message;
       if (modelUsed) {
-        aiModelName.textContent = modelUsed;
-        aiModelPill.hidden = false;
-        if (modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock')) {
-          aiModelPill.classList.add('fallback');
-        } else {
-          aiModelPill.classList.remove('fallback');
-        }
+        updateModelPills(modelUsed);
       }
     };
 
@@ -8584,7 +8608,6 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
       if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
       aiStatusGemini.hidden = true;
       aiStatusText.textContent = errMessage;
-      aiModelPill.hidden = true;
     };
 
     const clearEditorFields = () => {

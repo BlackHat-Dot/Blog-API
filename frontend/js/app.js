@@ -570,7 +570,13 @@
                 <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
               </div>
             </div>
-            <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            <div class="ai-head-right">
+              <div class="ai-model-pill" id="ai-header-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-header-model-name">gemini-2.5-flash</span>
+              </div>
+              <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            </div>
           </div>
           <div class="ai-body" id="ai-body" hidden>
             <div class="ai-input-group">
@@ -695,6 +701,8 @@
     const aiStatusText = $('#ai-status-text', f);
     const aiModelPill = $('#ai-model-pill', f);
     const aiModelName = $('#ai-model-name', f);
+    const aiHeaderModelPill = $('#ai-header-model-pill', f);
+    const aiHeaderModelName = $('#ai-header-model-name', f);
     const aiHeaderGemini = $('#ai-header-gemini', f);
     const aiTonesSection = $('#ai-tones-section', f);
     const aiTonesGrid = $('#ai-tones-grid', f);
@@ -703,13 +711,29 @@
 
     let selectedTone = '';
 
+    const updateModelPills = (modelUsed) => {
+      if (!modelUsed) return;
+      const isFallback = modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock');
+      
+      // Update inline status row pill
+      aiModelName.textContent = modelUsed;
+      aiModelPill.hidden = false;
+      aiModelPill.classList.toggle('fallback', isFallback);
+
+      // Update header pill so it remains visible even when collapsed
+      if (aiHeaderModelPill && aiHeaderModelName) {
+        aiHeaderModelName.textContent = modelUsed;
+        aiHeaderModelPill.hidden = false;
+        aiHeaderModelPill.classList.toggle('fallback', isFallback);
+      }
+    };
+
     const showAiLoading = (message) => {
       aiStatusRow.hidden = false;
       aiStatusGemini.hidden = false;
       aiStatusGemini.classList.add('spinning');
       if (aiHeaderGemini) aiHeaderGemini.classList.add('spinning');
       aiStatusText.textContent = message;
-      aiModelPill.hidden = true;
     };
 
     const showAiSuccess = (message, modelUsed) => {
@@ -719,13 +743,7 @@
       aiStatusGemini.hidden = false;
       aiStatusText.textContent = message;
       if (modelUsed) {
-        aiModelName.textContent = modelUsed;
-        aiModelPill.hidden = false;
-        if (modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock')) {
-          aiModelPill.classList.add('fallback');
-        } else {
-          aiModelPill.classList.remove('fallback');
-        }
+        updateModelPills(modelUsed);
       }
     };
 
@@ -735,7 +753,6 @@
       if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
       aiStatusGemini.hidden = true;
       aiStatusText.textContent = errMessage;
-      aiModelPill.hidden = true;
     };
 
     const clearEditorFields = () => {
