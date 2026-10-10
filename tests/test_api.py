@@ -269,4 +269,61 @@ def test_post_and_comment_lifecycle(client):
     # List comments
     comments_res = client.get(f"/api/v1/posts/{post_id}/comments")
     assert comments_res.status_code == 200
-    assert len(comments_res.json()) == 2
+    comments_data = comments_res.json()
+    assert len(comments_data) == 2
+    # Verify comments include author username and computed aliases
+    assert comments_data[0]["author"] is not None
+    assert comments_data[0]["author"]["username"] == "blogger"
+    assert comments_data[0]["author_username"] == "blogger"
+    assert comments_data[0]["username"] == "blogger"
+
+    # Test is_liked and is_bookmarked dynamic status
+    unauth_post = client.get(f"/api/v1/posts/{post_id}").json()
+    assert unauth_post["is_liked"] is False
+    assert unauth_post["is_bookmarked"] is False
+
+    auth_post_initial = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_initial["is_liked"] is False
+    assert auth_post_initial["is_bookmarked"] is False
+
+    # Like and Bookmark
+    client.post(f"/api/v1/posts/{post_id}/like", headers=headers)
+    client.post(f"/api/v1/posts/{post_id}/bookmark", headers=headers)
+
+    auth_post_after = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_after["is_liked"] is True
+    assert auth_post_after["is_bookmarked"] is True
+
+    # Check unauthenticated view still returns False
+    unauth_after = client.get(f"/api/v1/posts/{post_id}").json()
+    assert unauth_after["is_liked"] is False
+    assert unauth_after["is_bookmarked"] is False
+
+    # Check bookmarks listing endpoints
+    unauth_bm = client.get("/api/v1/bookmarks")
+    assert unauth_bm.status_code == 401
+
+    bm_res = client.get("/api/v1/bookmarks", headers=headers)
+    assert bm_res.status_code == 200
+    bm_data = bm_res.json()
+    assert bm_data["total"] == 1
+    assert len(bm_data["items"]) == 1
+    assert bm_data["items"][0]["id"] == post_id
+    assert bm_data["items"][0]["is_bookmarked"] is True
+
+    # Check /posts/bookmarks and /users/me/bookmarks aliases
+    assert client.get("/api/v1/posts/bookmarks", headers=headers).status_code == 200
+    assert client.get("/api/v1/users/me/bookmarks", headers=headers).status_code == 200
+
+    # Unbookmark & Unlike
+    del_bm = client.delete(f"/api/v1/posts/{post_id}/bookmark", headers=headers)
+    assert del_bm.status_code == 204
+    del_like = client.delete(f"/api/v1/posts/{post_id}/like", headers=headers)
+    assert del_like.status_code == 204
+
+    # Verify bookmarks empty and post flags reverted
+    bm_res_after = client.get("/api/v1/bookmarks", headers=headers).json()
+    assert bm_res_after["total"] == 0
+    auth_post_clean = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_clean["is_liked"] is False
+    assert auth_post_clean["is_bookmarked"] is False

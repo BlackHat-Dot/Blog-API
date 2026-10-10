@@ -1,4 +1,4 @@
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Bookmark, Follow, Like, Post, User
@@ -70,3 +70,25 @@ def remove_bookmark(session: Session, user_id: int, post_id: int) -> bool:
     session.delete(existing)
     session.commit()
     return True
+
+
+def list_user_bookmarks(
+    session: Session,
+    user_id: int,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Post], int]:
+    total = session.scalar(
+        select(func.count(Bookmark.id)).where(Bookmark.user_id == user_id)
+    ) or 0
+
+    statement = (
+        select(Post)
+        .join(Bookmark, Bookmark.post_id == Post.id)
+        .where(Bookmark.user_id == user_id)
+        .order_by(Bookmark.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    posts = session.scalars(statement).all()
+    return posts, total

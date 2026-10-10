@@ -87,6 +87,7 @@
     unlike: (id) => call('DELETE', `/posts/${id}/like`),
     bookmark: (id) => call('POST', `/posts/${id}/bookmark`),
     unbookmark: (id) => call('DELETE', `/posts/${id}/bookmark`),
+    bookmarks: (q) => call('GET', '/bookmarks', { query: q }),
 
     categories: () => call('GET', '/categories'),
     createCategory: (name) => call('POST', '/categories', { body: { name } }),

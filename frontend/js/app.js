@@ -246,8 +246,8 @@
 
   /* ------------------------------------------------------------------ post */
   function actionsHtml(p) {
-    const liked = S.likes.has(p.id);
-    const saved = S.marks.has(p.id);
+    const liked = (p && typeof p.is_liked === 'boolean') ? p.is_liked : S.likes.has(p.id);
+    const saved = (p && typeof p.is_bookmarked === 'boolean') ? p.is_bookmarked : S.marks.has(p.id);
     return `
       <button class="act" data-act="like" aria-pressed="${liked}" aria-label="${liked ? 'Unlike' : 'Like'} this post">${I.heart}<span>${p.like_count}</span></button>
       <button class="act" data-act="bookmark" aria-pressed="${saved}" aria-label="${saved ? 'Remove from saved' : 'Save this post'}">${I.mark}<span>${p.bookmark_count}</span></button>
@@ -274,7 +274,7 @@
       }
     });
     const roots = list.filter((c) => !c.parent_id || !known.has(c.parent_id));
-    const who = (c) => (c.author && c.author.username) || (S.me && c.author_id === S.me.id ? 'You' : `Member ${c.author_id}`);
+    const who = (c) => (c.author && c.author.username) || c.author_username || c.username || (S.me && c.author_id === S.me.id ? 'You' : `Member ${c.author_id}`);
     const node = (c, depth) => {
       const ch = kids.get(c.id) || [];
       return `<li class="cm" id="cm-${c.id}">
@@ -336,6 +336,8 @@
       API.profile(p.author.username).catch(() => null),
     ]);
     if (id !== nav) return;
+    if (typeof p.is_liked === 'boolean') { p.is_liked ? S.likes.add(p.id) : S.likes.delete(p.id); saveSet('likes', S.likes); }
+    if (typeof p.is_bookmarked === 'boolean') { p.is_bookmarked ? S.marks.add(p.id) : S.marks.delete(p.id); saveSet('marks', S.marks); }
     Object.assign(ctx, { post: p, comments, prof });
 
     const mine = S.me && S.me.username === p.author.username;
@@ -367,6 +369,8 @@
   async function refreshPost() {
     const p = await API.post(ctx.post.id);
     ctx.post = p;
+    if (typeof p.is_liked === 'boolean') { p.is_liked ? S.likes.add(p.id) : S.likes.delete(p.id); saveSet('likes', S.likes); }
+    if (typeof p.is_bookmarked === 'boolean') { p.is_bookmarked ? S.marks.add(p.id) : S.marks.delete(p.id); saveSet('marks', S.marks); }
     const a = $('.actions');
     if (a) swap(a, actionsHtml(p));
     return p;
@@ -419,17 +423,25 @@
     if (!S.me) return needAuth('Sign in to see your saved posts.');
     document.title = `Saved – ${APP}`;
     main.innerHTML = `<div class="profile"><h1 class="p-name" style="font-size:2.4rem">Saved</h1>${skeleton(2)}</div>`;
-    const ids = [...S.marks].reverse();
-    const res = await Promise.allSettled(ids.slice(0, 40).map((x) => API.post(x)));
+    let items = [];
+    try {
+      const data = await API.bookmarks({ limit: 50 });
+      items = (data && data.items) || [];
+      S.marks = new Set(items.map((p) => p.id));
+      saveSet('marks', S.marks);
+    } catch {
+      const ids = [...S.marks].reverse();
+      const res = await Promise.allSettled(ids.slice(0, 40).map((x) => API.post(x)));
+      if (id !== nav) return;
+      res.forEach((r, i) => {
+        if (r.status === 'fulfilled') items.push(r.value);
+        else if (r.reason && r.reason.status === 404) S.marks.delete(ids[i]);
+      });
+      saveSet('marks', S.marks);
+    }
     if (id !== nav) return;
-    const items = [];
-    res.forEach((r, i) => {
-      if (r.status === 'fulfilled') items.push(r.value);
-      else if (r.reason && r.reason.status === 404) S.marks.delete(ids[i]);
-    });
-    saveSet('marks', S.marks);
     main.innerHTML = `<div class="profile"><div class="p-head"><h1 class="p-name" style="font-size:clamp(2rem,5vw,3rem)">Saved</h1>
-      <p class="p-bio muted" style="font-size:1rem">Saved posts are kept in this browser.</p></div>
+      <p class="p-bio muted" style="font-size:1rem">Stories you've bookmarked for later.</p></div>
       <div class="plist">${items.length ? items.map((p, i) => entry(p, { i })).join('') : '<div class="empty"><h2>Nothing saved yet</h2><p>Use the bookmark on a post to keep it here.</p><a class="btn btn-ghost" href="#/">Browse posts</a></div>'}</div></div>`;
     $('.plist').classList.add('anim');
   }
@@ -493,6 +505,13 @@
     S.me = await API.me();
     S.likes = loadSet('likes');
     S.marks = loadSet('marks');
+    try {
+      const bmData = await API.bookmarks({ limit: 100 });
+      if (bmData && Array.isArray(bmData.items)) {
+        bmData.items.forEach((p) => S.marks.add(p.id));
+        saveSet('marks', S.marks);
+      }
+    } catch { /* ignore */ }
     renderBar();
     let next = '#/';
     try { next = sessionStorage.getItem('longhand.next') || '#/'; sessionStorage.removeItem('longhand.next'); } catch { /* ignore */ }
@@ -771,7 +790,7 @@
     async like(t) {
       if (!S.me) return needAuth('Sign in to like posts.');
       const p = ctx.post, run = nav;
-      const had = S.likes.has(p.id);
+      const had = (p && typeof p.is_liked === 'boolean') ? p.is_liked : S.likes.has(p.id);
       await busy(t, async () => {
         try {
           if (had) { try { await API.unlike(p.id); } catch (e) { if (e.status !== 400) throw e; } } else await API.like(p.id);
@@ -784,7 +803,7 @@
     async bookmark(t) {
       if (!S.me) return needAuth('Sign in to save posts.');
       const p = ctx.post, run = nav;
-      const had = S.marks.has(p.id);
+      const had = (p && typeof p.is_bookmarked === 'boolean') ? p.is_bookmarked : S.marks.has(p.id);
       await busy(t, async () => {
         try {
           if (had) { try { await API.unbookmark(p.id); } catch (e) { if (e.status !== 400) throw e; } } else await API.bookmark(p.id);
@@ -973,7 +992,17 @@
     if (API.token.get()) {
       try { S.me = await API.me(); } catch { /* signed out or offline; the view reports it */ }
     }
-    if (S.me) { S.likes = loadSet('likes'); S.marks = loadSet('marks'); }
+    if (S.me) {
+      S.likes = loadSet('likes');
+      S.marks = loadSet('marks');
+      try {
+        const bmData = await API.bookmarks({ limit: 100 });
+        if (bmData && Array.isArray(bmData.items)) {
+          bmData.items.forEach((p) => S.marks.add(p.id));
+          saveSet('marks', S.marks);
+        }
+      } catch { /* offline / fallback */ }
+    }
     renderBar();
     route();
   })();

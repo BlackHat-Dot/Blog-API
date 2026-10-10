@@ -52,6 +52,8 @@ class PostResponse(BaseModel):
     comment_count: int = 0
     created_at: datetime
     updated_at: datetime
+    is_liked: bool = False
+    is_bookmarked: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

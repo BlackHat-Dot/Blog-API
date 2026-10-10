@@ -21,10 +21,7 @@ tags, new categories and local autosave; sign in and registration.
 
 ## Where the API shapes the UI
 
-- The API doesn't say whether the current user liked or saved a post, so this browser remembers it.
-  The Saved page is therefore per browser.
-- Comments carry only `author_id`, so other people show as "Member 12". Adding `username` to
-  `CommentRead` makes the names appear with no frontend change.
-- A post's category can't be cleared through `PUT /posts/{id}`, so the editor doesn't offer
-  "No category" once a post has one.
-- `GET /posts?state=draft` is public, so drafts are not private. Consider restricting it to the author.
+- Bookmarks listing (`GET /bookmarks`, `/posts/bookmarks`, `/users/me/bookmarks`) enables server-synced Saved posts across all devices.
+- `PostResponse` includes dynamic `is_liked` and `is_bookmarked` flags for the authenticated user, keeping like and save buttons active after page refresh.
+- `CommentRead` includes `author.username` and `author_username`, so comments show author names instead of generic fallbacks.
+- Authentication token is persisted in `localStorage` (`longhand.token`), preserving the user session across browser reloads.

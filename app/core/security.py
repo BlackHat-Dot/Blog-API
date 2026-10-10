@@ -30,6 +30,7 @@ def get_password_hash(password: str) -> str:
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_str}/auth/login")
+oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_str}/auth/login", auto_error=False)
 
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
@@ -67,3 +68,16 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def get_optional_current_user(
+    token: str | None = Depends(oauth2_optional_scheme),
+    session: Session = Depends(get_session),
+) -> User | None:
+    if not token:
+        return None
+    try:
+        token_data = decode_access_token(token)
+        return session.scalar(select(User).where(User.email == token_data.sub))
+    except Exception:
+        return None
