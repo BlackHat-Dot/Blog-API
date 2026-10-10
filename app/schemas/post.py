@@ -1,18 +1,29 @@
 from datetime import datetime
 from typing import List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.category import CategoryRead
 
 
 class PostBase(BaseModel):
-    title: str = Field(..., min_length=5)
-    summary: str | None = None
-    body: str = Field(..., min_length=20)
+    title: str = Field(..., min_length=5, max_length=255)
+    summary: str | None = Field(None, max_length=1000)
+    body: str = Field(..., min_length=20, max_length=100000)
     category_id: int | None = None
-    tags: list[str] = []
+    tags: list[str] = Field(default_factory=list, max_length=15)
     state: str = Field("draft", pattern=r"^(draft|published)$")
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, tags_list: list[str]) -> list[str]:
+        if tags_list:
+            if len(tags_list) > 15:
+                raise ValueError("A post can have at most 15 tags")
+            for t in tags_list:
+                if len(t.strip()) > 30:
+                    raise ValueError(f"Tag '{t[:15]}...' exceeds the maximum length of 30 characters")
+        return tags_list
 
 
 class PostCreate(PostBase):
@@ -20,12 +31,23 @@ class PostCreate(PostBase):
 
 
 class PostUpdate(BaseModel):
-    title: str | None = None
-    summary: str | None = None
-    body: str | None = None
+    title: str | None = Field(None, min_length=5, max_length=255)
+    summary: str | None = Field(None, max_length=1000)
+    body: str | None = Field(None, min_length=20, max_length=100000)
     category_id: int | None = None
-    tags: list[str] | None = None
+    tags: list[str] | None = Field(None, max_length=15)
     state: str | None = Field(None, pattern=r"^(draft|published)$")
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, tags_list: list[str] | None) -> list[str] | None:
+        if tags_list is not None:
+            if len(tags_list) > 15:
+                raise ValueError("A post can have at most 15 tags")
+            for t in tags_list:
+                if len(t.strip()) > 30:
+                    raise ValueError(f"Tag '{t[:15]}...' exceeds the maximum length of 30 characters")
+        return tags_list
 
 
 class PostAuthor(BaseModel):

@@ -1,9 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CategoryCreate(BaseModel):
-    name: str
-    slug: str | None = None
+    name: str = Field(..., min_length=1, max_length=50)
+    slug: str | None = Field(None, max_length=60)
 
 
 class CategoryRead(BaseModel):

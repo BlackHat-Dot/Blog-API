@@ -569,7 +569,7 @@
           </div>
           <div class="ai-body" id="ai-body" hidden>
             <div class="ai-input-group">
-              <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." autocomplete="off">
+              <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." maxlength="500" autocomplete="off">
               <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
             </div>
             <p class="ai-status" id="ai-status" hidden></p>
@@ -580,7 +580,7 @@
               </div>
               <div class="ai-tones-grid" id="ai-tones-grid"></div>
               <div class="ai-custom-row">
-                <input type="text" class="ai-input" id="ai-custom-tone-in" placeholder="Or specify your custom tone...">
+                <input type="text" class="ai-input" id="ai-custom-tone-in" placeholder="Or specify your custom tone..." maxlength="100">
                 <button type="button" class="btn" id="ai-write-btn" disabled>Write Post</button>
               </div>
             </div>
@@ -589,14 +589,14 @@
         <label class="sr" for="ed-title">Title</label>
         <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="255" autocomplete="off">
         <label class="sr" for="ed-sum">Summary</label>
-        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" placeholder="A sentence or two that sets up the post (optional)"></textarea>
+        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="1000" placeholder="A sentence or two that sets up the post (optional)"></textarea>
         <div class="ed-tabs" role="tablist" aria-label="Editor mode">
           <button type="button" role="tab" id="tab-write" aria-selected="true" aria-controls="ed-body" data-tab="write">Write</button>
           <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="ed-preview" data-tab="preview">Preview</button>
           <span class="hint">Markdown: # heading, **bold**, *italic*, &gt; quote, - list, \`code\`</span>
         </div>
         <label class="sr" for="ed-body">Body</label>
-        <textarea class="ed-body" id="ed-body" name="body" placeholder="Start writing…"></textarea>
+        <textarea class="ed-body" id="ed-body" name="body" maxlength="100000" placeholder="Start writing…"></textarea>
         <div class="prose" id="ed-preview" hidden></div>
       </div>
       <aside class="ed-side" aria-label="Post settings">
@@ -610,11 +610,11 @@
             ${cats.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
             <option value="__new__">New category…</option>
           </select>
-          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="100" hidden style="margin-top:8px" aria-label="New category name">
+          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="50" hidden style="margin-top:8px" aria-label="New category name">
         </div>
         <div class="field"><label for="ed-tags">Tags</label>
           <div class="chips" id="chips"></div>
-          <input id="ed-tags" type="text" list="tag-list" placeholder="Add a tag, then press Enter" autocomplete="off">
+          <input id="ed-tags" type="text" list="tag-list" maxlength="30" placeholder="Add a tag, then press Enter" autocomplete="off">
           <datalist id="tag-list">${tagNames.map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
         </div>
         <p class="stats" id="ed-stats"></p>
@@ -659,7 +659,10 @@
     };
     const addTag = (raw) => {
       const t = raw.trim().toLowerCase().replace(/,+$/, '').trim();
-      if (t && !E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
+      if (!t) return;
+      if (t.length > 30) { toast('Each tag must be 30 characters or less.'); return; }
+      if (E.tags.length >= 15) { toast('A post can have at most 15 tags.'); return; }
+      if (!E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
       tagIn.value = '';
     };
 
@@ -697,6 +700,11 @@
       if (!topic) {
         aiStatus.hidden = false;
         aiStatus.textContent = 'Please depict your topic or idea first.';
+        return;
+      }
+      if (topic.length > 500) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
         return;
       }
       aiTonesBtn.disabled = true;
@@ -751,6 +759,16 @@
       const topic = aiTopicIn.value.trim();
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
+      if (topic.length > 500) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
+        return;
+      }
+      if (tone.length > 100) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Tone must be 100 characters or less.';
+        return;
+      }
 
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;
@@ -892,11 +910,16 @@
         err.textContent = '';
         addTag(tagIn.value);
         if (E.title.trim().length < 5) { err.textContent = 'Give the post a title of at least 5 characters.'; title.focus(); return; }
+        if (E.title.trim().length > 255) { err.textContent = 'Title must be 255 characters or less.'; title.focus(); return; }
+        if (E.summary && E.summary.trim().length > 1000) { err.textContent = 'Description/summary must be 1,000 characters or less.'; sum.focus(); return; }
         if (E.body.trim().length < 20) { err.textContent = 'Write at least 20 characters in the body.'; body.focus(); return; }
+        if (E.body.length > 100000) { err.textContent = 'Body must be 100,000 characters or less.'; body.focus(); return; }
+        if (E.tags.length > 15) { err.textContent = 'A post can have at most 15 tags.'; tagIn.focus(); return; }
         let categoryId = cat.value === '__new__' ? null : cat.value ? Number(cat.value) : null;
         if (cat.value === '__new__') {
           const name = newcat.value.trim();
           if (!name) { err.textContent = 'Name the new category, or pick an existing one.'; newcat.focus(); return; }
+          if (name.length > 50) { err.textContent = 'Category name must be 50 characters or less.'; newcat.focus(); return; }
           const c = await API.createCategory(name);
           S.cats = null;
           categoryId = c.id;

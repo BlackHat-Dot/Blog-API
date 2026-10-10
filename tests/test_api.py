@@ -425,3 +425,61 @@ def test_ai_tones_and_post_generation(client):
     assert isinstance(gen_data["tags"], list)
     assert len(gen_data["tags"]) >= 1
     assert gen_data["category"] in ["Technology", "Architecture"]
+
+    # --- Test Field Length Limits ---
+    # 1. Topic > 500 chars -> 422
+    long_topic = "A" * 501
+    bad_topic = client.post("/api/v1/ai/suggest-tones", json={"prompt": long_topic}, headers=headers)
+    assert bad_topic.status_code == 422
+
+    # 2. Category > 50 chars -> 422
+    long_cat = client.post("/api/v1/categories", json={"name": "C" * 51}, headers=headers)
+    assert long_cat.status_code == 422
+
+    # 3. Post Summary / Description > 1000 chars -> 422
+    bad_sum = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "Valid Post Title Here",
+            "summary": "S" * 1001,
+            "body": "This is a valid body with sufficient characters for testing.",
+        },
+        headers=headers,
+    )
+    assert bad_sum.status_code == 422
+
+    # 4. Post Body > 100,000 chars -> 422
+    bad_body = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "Valid Post Title Here",
+            "summary": "Valid summary",
+            "body": "B" * 100001,
+        },
+        headers=headers,
+    )
+    assert bad_body.status_code == 422
+
+    # 5. Tag length > 30 chars -> 422
+    bad_tag_len = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "Valid Post Title Here",
+            "body": "This is a valid body with sufficient characters for testing.",
+            "tags": ["T" * 31],
+        },
+        headers=headers,
+    )
+    assert bad_tag_len.status_code == 422
+
+    # 6. Tag count > 15 -> 422
+    bad_tag_cnt = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "Valid Post Title Here",
+            "body": "This is a valid body with sufficient characters for testing.",
+            "tags": [f"tag{i}" for i in range(16)],
+        },
+        headers=headers,
+    )
+    assert bad_tag_cnt.status_code == 422
