@@ -54,6 +54,11 @@ class UserLogin(BaseModel):
         return validate_gmail_address(str(v))
 
 
+class UserUpdate(BaseModel):
+    username: str | None = Field(None, min_length=3, max_length=50)
+    bio: str | None = None
+
+
 class UserRead(BaseModel):
     id: int
     email: EmailStr

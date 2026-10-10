@@ -75,6 +75,7 @@
     register: (b) => call('POST', '/auth/register', { body: b }),
     login: (email, password) => call('POST', '/auth/login', { body: { email, password } }),
     me: () => call('GET', '/users/me'),
+    updateMe: (b) => call('PUT', '/users/me', { body: b }),
 
     posts: (q) => call('GET', '/posts', { query: q }),
     popular: (q) => call('GET', '/posts/popular', { query: q }),

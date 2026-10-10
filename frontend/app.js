@@ -108,6 +108,7 @@
              <details class="menu"><summary aria-label="Account menu">${esc(me.username)}</summary>
                <div class="menu-pop">
                  <a href="${userHref(me.username)}">Your profile</a>
+                 <button type="button" class="btn-quiet" style="text-align:left;padding:8px 12px;color:var(--ink);width:100%" data-act="edit-profile">Edit profile</button>
                  <a href="${userHref(me.username)}?tab=drafts">Your drafts</a>
                  <a href="#/saved">Saved posts</a>
                  <button type="button" data-act="signout">Sign out</button>
@@ -381,7 +382,7 @@
         <span><b>${prof.follower_count.toLocaleString()}</b>${prof.follower_count === 1 ? 'follower' : 'followers'}</span>
         <span><b>${prof.following_count.toLocaleString()}</b>following</span>
         <span>Joined ${fmtDate(prof.created_at)}</span></p>
-      ${mine ? '<a class="btn" href="#/write">Write a post</a>'
+      ${mine ? '<div class="row"><a class="btn" href="#/write">Write a post</a><button class="btn btn-ghost" data-act="edit-profile">Edit profile</button></div>'
         : `<button class="btn ${prof.is_following ? 'btn-ghost' : ''}" data-act="follow" data-user="${esc(prof.username)}" aria-pressed="${prof.is_following}">${prof.is_following ? 'Following' : 'Follow'}</button>`}
     </div>`;
   }
@@ -688,6 +689,66 @@
         try { localStorage.setItem('longhand.apiBase', entered.trim()); } catch (_) {}
         window.location.reload();
       }
+    },
+    'edit-profile'() {
+      if (!S.me) return needAuth('Sign in to edit your profile.');
+      const d = $('#dlg');
+      const curUser = S.me.username || '';
+      const curBio = S.me.bio || '';
+      d.innerHTML = `<form method="dialog" id="f-edit-profile">
+        <h2>Edit profile</h2>
+        <div class="field" style="margin-top:16px">
+          <label for="ep-user">Username</label>
+          <input id="ep-user" name="username" type="text" minlength="3" maxlength="50" value="${esc(curUser)}" required autocomplete="username">
+          <p class="hint">3 to 50 characters.</p>
+        </div>
+        <div class="field">
+          <label for="ep-bio">Bio</label>
+          <textarea id="ep-bio" name="bio" rows="3" placeholder="Tell readers a bit about yourself">${esc(curBio)}</textarea>
+        </div>
+        <p class="err" id="ep-err" role="alert" style="margin-bottom:14px"></p>
+        <div class="row">
+          <button type="submit" class="btn" id="ep-save">Save changes</button>
+          <button type="button" class="btn btn-ghost" value="cancel" data-act="dlg-cancel">Cancel</button>
+        </div>
+      </form>`;
+
+      const f = $('#f-edit-profile', d);
+      const errEl = $('#ep-err', d);
+      const saveBtn = $('#ep-save', d);
+
+      $('[data-act="dlg-cancel"]', d).onclick = () => d.close();
+
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        errEl.textContent = '';
+        const newUsername = $('#ep-user', f).value.trim();
+        const newBio = $('#ep-bio', f).value.trim();
+
+        if (newUsername.length < 3) {
+          errEl.textContent = 'Username must be at least 3 characters.';
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        try {
+          const updated = await API.updateMe({ username: newUsername, bio: newBio });
+          S.me = updated;
+          renderBar();
+          d.close();
+          toast('Profile updated');
+          location.hash = userHref(updated.username);
+        } catch (err) {
+          errEl.textContent = err.message || 'Failed to update profile.';
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save changes';
+        }
+      };
+
+      d.showModal();
+      $('#ep-user', d).focus();
     },
     more: (t) => ctx.more && ctx.more(),
     signout() {

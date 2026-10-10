@@ -122,6 +122,19 @@ def test_auth_and_user_flows(client):
     assert me_res.status_code == 200
     assert me_res.json()["username"] == "author1"
 
+    # Edit profile: update bio
+    edit_bio_res = client.put("/api/v1/users/me", json={"bio": "Writer and explorer"}, headers=headers1)
+    assert edit_bio_res.status_code == 200
+    assert edit_bio_res.json()["bio"] == "Writer and explorer"
+
+    # Edit profile: change username
+    edit_user_res = client.put("/api/v1/users/me", json={"username": "author_prime"}, headers=headers1)
+    assert edit_user_res.status_code == 200
+    assert edit_user_res.json()["username"] == "author_prime"
+
+    # Edit profile: change back to author1
+    client.put("/api/v1/users/me", json={"username": "author1"}, headers=headers1)
+
     # Register user 2
     client.post(
         "/api/v1/auth/register",
@@ -133,6 +146,11 @@ def test_auth_and_user_flows(client):
     )
     token2 = login_res2.json()["access_token"]
     headers2 = {"Authorization": f"Bearer {token2}"}
+
+    # Attempt to change reader's username to author1 (should fail with 400 - already taken)
+    dup_edit_res = client.put("/api/v1/users/me", json={"username": "author1"}, headers=headers2)
+    assert dup_edit_res.status_code == 400
+    assert "already taken" in dup_edit_res.json()["detail"].lower()
 
     # Follow author1 by reader
     follow_res = client.post("/api/v1/profiles/author1/follow", headers=headers2)
