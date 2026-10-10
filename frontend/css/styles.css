@@ -199,11 +199,11 @@ label, legend { font-weight: 500; }
 @keyframes draw { from { transform: scaleX(0); } }
 .anim .len i { transform-origin: left; animation: draw .9s var(--ease) both; animation-delay: calc(var(--n, 0) * 70ms); }
 
-.entry-title { font: 650 clamp(1.4rem, 2.2vw, 1.75rem)/1.2 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
+.entry-title { font: 650 clamp(1.2rem, 1.7vw, 1.5rem)/1.25 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
 .entry-title a { text-decoration: none; }
 .entry-title a::after { content: ""; position: absolute; inset: 0; }
 .entry-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-.lead .entry-title { font-size: clamp(2.1rem, 4.4vw, 3.2rem); font-weight: 700; line-height: 1.07; letter-spacing: -.022em; }
+.lead .entry-title { font-size: clamp(1.7rem, 2.9vw, 2.3rem); font-weight: 700; line-height: 1.12; letter-spacing: -.02em; }
 .entry-sum { margin-top: 10px; max-width: 62ch; font: 400 1.0625rem/1.6 var(--serif); color: var(--ink-2); }
 .lead .entry-sum { font-size: 1.22rem; margin-top: 16px; }
 .entry-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 14px; font-size: 14px; color: var(--mute); }
