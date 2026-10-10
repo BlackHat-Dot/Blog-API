@@ -140,36 +140,6 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 label, legend { font-weight: 500; }
 .field { margin-bottom: 20px; }
 .field > label, .field > legend { display: block; margin-bottom: 6px; }
-.label-with-info { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.label-with-info > label { margin-bottom: 0; }
-.info-tip { position: relative; display: inline-flex; align-items: center; cursor: pointer; outline: none; }
-.info-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 17px; height: 17px; border-radius: 50%;
-  background: var(--paper-2); border: 1px solid var(--line-2);
-  color: var(--mute); font-family: var(--serif); font-size: 11px; font-weight: 700;
-  font-style: italic; transition: all .15s; line-height: 1;
-}
-.info-tip:hover .info-badge, .info-tip:focus-visible .info-badge {
-  background: var(--ink); color: var(--paper); border-color: var(--ink);
-}
-.tip-content {
-  position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: var(--paper); font-family: var(--sans); font-size: 12.5px;
-  font-style: normal; font-weight: 400; line-height: 1.45;
-  padding: 8px 12px; border-radius: 6px; width: max-content; max-width: 280px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .18); pointer-events: none;
-  opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s; z-index: 50;
-  text-align: left;
-}
-.tip-content::after {
-  content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border-width: 5px; border-style: solid;
-  border-color: var(--ink) transparent transparent transparent;
-}
-.info-tip:hover .tip-content, .info-tip:focus-visible .tip-content {
-  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-2px);
-}
 .err { color: var(--bad); font-size: 15px; white-space: pre-line; min-height: 1.4em; }
 .hint { color: var(--mute); font-size: 14px; }
 

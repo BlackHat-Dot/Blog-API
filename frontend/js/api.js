@@ -13,21 +13,9 @@
     }
   }
 
-  let _memToken = null;
   const token = {
-    get() {
-      try {
-        const t = localStorage.getItem(KEY);
-        if (t) return t;
-      } catch { /* storage blocked */ }
-      return _memToken;
-    },
-    set(t) {
-      _memToken = t;
-      try {
-        t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY);
-      } catch { /* storage blocked */ }
-    },
+    get() { try { return localStorage.getItem(KEY); } catch { return null; } },
+    set(t) { try { t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY); } catch { /* storage blocked */ } },
   };
 
   function detailText(d) {
@@ -99,7 +87,6 @@
     unlike: (id) => call('DELETE', `/posts/${id}/like`),
     bookmark: (id) => call('POST', `/posts/${id}/bookmark`),
     unbookmark: (id) => call('DELETE', `/posts/${id}/bookmark`),
-    bookmarks: (q) => call('GET', '/bookmarks', { query: q }),
 
     categories: () => call('GET', '/categories'),
     createCategory: (name) => call('POST', '/categories', { body: { name } }),
