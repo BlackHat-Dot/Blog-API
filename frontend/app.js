@@ -554,6 +554,36 @@
     main.innerHTML = `<form class="editor" data-form="editor" novalidate>
       <div class="ed-main">
         ${restored ? '<p class="restored">Restored your unsaved draft. <button type="button" class="btn-quiet" style="padding:0" data-act="discard-draft">Discard it</button></p>' : ''}
+        <div class="ai-panel" id="ai-panel">
+          <div class="ai-head-row" id="ai-head-toggle">
+            <div class="ai-title-wrap">
+              <span class="ai-badge">✨ AI</span>
+              <div>
+                <span class="ai-title">Write with AI</span>
+                <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
+              </div>
+            </div>
+            <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+          </div>
+          <div class="ai-body" id="ai-body" hidden>
+            <div class="ai-input-group">
+              <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why SQLite in production is a great idea)..." autocomplete="off">
+              <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
+            </div>
+            <p class="ai-status" id="ai-status" hidden></p>
+            <div class="ai-tones-section" id="ai-tones-section" hidden>
+              <div class="ai-tones-header">
+                <span>Suggested tones for this depiction:</span>
+                <span class="muted" style="font-weight:normal;font-size:12px">Pick a tone to write the draft</span>
+              </div>
+              <div class="ai-tones-grid" id="ai-tones-grid"></div>
+              <div class="ai-custom-row">
+                <input type="text" class="ai-input" id="ai-custom-tone-in" placeholder="Or specify your custom tone...">
+                <button type="button" class="btn" id="ai-write-btn" disabled>Write Post</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <label class="sr" for="ed-title">Title</label>
         <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="255" autocomplete="off">
         <label class="sr" for="ed-sum">Summary</label>
@@ -629,6 +659,158 @@
       const t = raw.trim().toLowerCase().replace(/,+$/, '').trim();
       if (t && !E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
       tagIn.value = '';
+    };
+
+    // ------------------------------------------------ AI Assistant wiring
+    const aiPanel = $('#ai-panel', f);
+    const aiHeadToggle = $('#ai-head-toggle', f);
+    const aiExpandBtn = $('#ai-expand-btn', f);
+    const aiBody = $('#ai-body', f);
+    const aiTopicIn = $('#ai-topic-in', f);
+    const aiTonesBtn = $('#ai-tones-btn', f);
+    const aiStatus = $('#ai-status', f);
+    const aiTonesSection = $('#ai-tones-section', f);
+    const aiTonesGrid = $('#ai-tones-grid', f);
+    const aiCustomToneIn = $('#ai-custom-tone-in', f);
+    const aiWriteBtn = $('#ai-write-btn', f);
+
+    let selectedTone = '';
+
+    const toggleAiPanel = () => {
+      const isHidden = aiBody.hidden;
+      aiBody.hidden = !isHidden;
+      aiPanel.classList.toggle('open', !aiBody.hidden);
+      aiExpandBtn.textContent = aiBody.hidden ? 'Expand' : 'Collapse';
+      if (!aiBody.hidden) aiTopicIn.focus();
+    };
+
+    aiHeadToggle.onclick = (e) => {
+      if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') toggleAiPanel();
+    };
+    aiExpandBtn.onclick = toggleAiPanel;
+
+    // Step 1: Discover Dynamic Tones
+    aiTonesBtn.onclick = async () => {
+      const topic = aiTopicIn.value.trim();
+      if (!topic) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Please depict your topic or idea first.';
+        return;
+      }
+      aiTonesBtn.disabled = true;
+      aiStatus.hidden = false;
+      aiStatus.textContent = '✨ Analyzing your depiction and discovering tailored tones...';
+      aiTonesSection.hidden = true;
+      try {
+        const res = await API.suggestTones(topic);
+        const tones = res.tones || [];
+        aiTonesGrid.innerHTML = tones.map((t, i) => `
+          <div class="ai-tone-card" data-idx="${i}" data-tone="${esc(t.name)}">
+            <div class="ai-tone-name">${esc(t.name)}</div>
+            <div class="ai-tone-desc">${esc(t.description)}</div>
+          </div>
+        `).join('');
+
+        selectedTone = tones.length ? tones[0].name : '';
+        const firstCard = aiTonesGrid.querySelector('.ai-tone-card');
+        if (firstCard) firstCard.classList.add('selected');
+        aiCustomToneIn.value = selectedTone;
+        aiWriteBtn.disabled = false;
+        aiWriteBtn.textContent = `Write in "${selectedTone.slice(0, 20)}..."`;
+
+        aiTonesGrid.querySelectorAll('.ai-tone-card').forEach((card) => {
+          card.onclick = () => {
+            aiTonesGrid.querySelectorAll('.ai-tone-card').forEach((c) => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedTone = card.dataset.tone;
+            aiCustomToneIn.value = selectedTone;
+            aiWriteBtn.disabled = false;
+            aiWriteBtn.textContent = `Write in "${selectedTone.slice(0, 20)}..."`;
+          };
+        });
+
+        aiCustomToneIn.oninput = () => {
+          selectedTone = aiCustomToneIn.value.trim();
+          aiWriteBtn.disabled = !selectedTone;
+          aiWriteBtn.textContent = selectedTone ? `Write in "${selectedTone.slice(0, 18)}..."` : 'Pick a tone';
+        };
+
+        aiStatus.hidden = true;
+        aiTonesSection.hidden = false;
+      } catch (err) {
+        aiStatus.textContent = `Could not analyze tones: ${err.message}`;
+      } finally {
+        aiTonesBtn.disabled = false;
+      }
+    };
+
+    // Step 2: Generate Post with Selected Tone
+    aiWriteBtn.onclick = async () => {
+      const topic = aiTopicIn.value.trim();
+      const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
+      if (!topic || !tone) return;
+
+      aiWriteBtn.disabled = true;
+      aiTonesBtn.disabled = true;
+      aiStatus.hidden = false;
+      aiStatus.textContent = `✍️ Writing post with impeccable grammar in "${tone}" tone...`;
+
+      try {
+        const existingCatNames = cats.map((c) => c.name);
+        const res = await API.generatePost(topic, tone, existingCatNames);
+
+        // Auto-fill Title, Summary, Body
+        title.value = res.title;
+        E.title = res.title;
+
+        sum.value = res.summary;
+        E.summary = res.summary;
+
+        body.value = res.body;
+        E.body = res.body;
+
+        // Auto-fill tags
+        if (Array.isArray(res.tags)) {
+          E.tags = Array.from(new Set([...E.tags, ...res.tags]));
+          drawChips();
+        }
+
+        // Auto-fill category
+        if (res.category) {
+          const matched = cats.find((c) => c.name.toLowerCase() === res.category.toLowerCase());
+          if (matched) {
+            cat.value = String(matched.id);
+            E.category_id = matched.id;
+          }
+        }
+
+        autosize(sum);
+        autosize(body);
+        stats();
+        persist();
+
+        // Highlight fields with gentle glow
+        title.classList.add('ai-filled-glow');
+        sum.classList.add('ai-filled-glow');
+        body.classList.add('ai-filled-glow');
+        setTimeout(() => {
+          title.classList.remove('ai-filled-glow');
+          sum.classList.remove('ai-filled-glow');
+          body.classList.remove('ai-filled-glow');
+        }, 1500);
+
+        aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
+        toast('AI post draft generated!');
+        setTimeout(() => {
+          toggleAiPanel();
+          title.focus();
+        }, 1200);
+      } catch (err) {
+        aiStatus.textContent = `Post generation error: ${err.message}`;
+      } finally {
+        aiWriteBtn.disabled = false;
+        aiTonesBtn.disabled = false;
+      }
     };
 
     drawChips(); stats(); label(); autosize(body); autosize(sum);

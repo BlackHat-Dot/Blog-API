@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7
     database_url: str = Field(..., validation_alias="DATABASE_URL")
     allowed_origins: list[str] | str = ["*"]
+    gemini_api_key: str | None = Field(None, validation_alias="GEMINI_API_KEY")
+    openai_api_key: str | None = Field(None, validation_alias="OPENAI_API_KEY")
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

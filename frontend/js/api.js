@@ -13,9 +13,21 @@
     }
   }
 
+  let _memToken = null;
   const token = {
-    get() { try { return localStorage.getItem(KEY); } catch { return null; } },
-    set(t) { try { t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY); } catch { /* storage blocked */ } },
+    get() {
+      try {
+        const t = localStorage.getItem(KEY);
+        if (t) return t;
+      } catch { /* storage blocked */ }
+      return _memToken;
+    },
+    set(t) {
+      _memToken = t;
+      try {
+        t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY);
+      } catch { /* storage blocked */ }
+    },
   };
 
   function detailText(d) {
@@ -87,6 +99,10 @@
     unlike: (id) => call('DELETE', `/posts/${id}/like`),
     bookmark: (id) => call('POST', `/posts/${id}/bookmark`),
     unbookmark: (id) => call('DELETE', `/posts/${id}/bookmark`),
+    bookmarks: (q) => call('GET', '/bookmarks', { query: q }),
+
+    suggestTones: (prompt, apiKey) => call('POST', '/ai/suggest-tones', { body: { prompt, api_key: apiKey } }),
+    generatePost: (prompt, tone, existingCategories, apiKey) => call('POST', '/ai/generate-post', { body: { prompt, tone, existing_categories: existingCategories, api_key: apiKey } }),
 
     categories: () => call('GET', '/categories'),
     createCategory: (name) => call('POST', '/categories', { body: { name } }),

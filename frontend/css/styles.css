@@ -376,3 +376,142 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ------------------------------------------------------------------ AI Assistant Widget */
+.ai-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+.ai-panel.open {
+  border-color: var(--accent);
+}
+.ai-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.ai-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent);
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.ai-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+.ai-desc {
+  font-size: 13px;
+  color: var(--muted);
+}
+.ai-body {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.ai-input-group {
+  display: flex;
+  gap: 10px;
+}
+.ai-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ai-input:focus {
+  border-color: var(--accent);
+}
+.ai-status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-tones-section {
+  margin-top: 18px;
+  animation: fadeIn 0.25s ease-out;
+}
+.ai-tones-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ai-tones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ai-tone-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+.ai-tone-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.ai-tone-card.selected {
+  border-color: var(--accent);
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.ai-tone-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.ai-tone-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.ai-custom-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+@keyframes flashGlow {
+  0% { box-shadow: 0 0 0 2px var(--accent); }
+  100% { box-shadow: none; }
+}
+.ai-filled-glow {
+  animation: flashGlow 1.2s ease-out;
+}

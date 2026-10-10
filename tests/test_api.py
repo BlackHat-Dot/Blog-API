@@ -367,3 +367,61 @@ def test_post_and_comment_lifecycle(client):
 
     # Verify post is deleted
     assert client.get(f"/api/v1/posts/{post_id}").status_code == 404
+
+
+def test_ai_tones_and_post_generation(client):
+    # Setup user
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "aiwriter@gmail.com", "username": "aiwriter", "password": "Password123!"},
+    )
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "aiwriter@gmail.com", "password": "Password123!"},
+    )
+    headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
+    # Test suggest-tones without auth (401)
+    unauth_tones = client.post("/api/v1/ai/suggest-tones", json={"prompt": "Why SQLite in production is awesome"})
+    assert unauth_tones.status_code == 401
+
+    # Test suggest-tones with auth (200)
+    tones_res = client.post(
+        "/api/v1/ai/suggest-tones",
+        json={"prompt": "Why SQLite in production is awesome"},
+        headers=headers,
+    )
+    assert tones_res.status_code == 200
+    tones_data = tones_res.json()
+    assert "tones" in tones_data
+    assert len(tones_data["tones"]) >= 3
+    selected_tone = tones_data["tones"][0]["name"]
+    assert len(selected_tone) > 0
+    assert "description" in tones_data["tones"][0]
+
+    # Test generate-post without auth (401)
+    unauth_gen = client.post(
+        "/api/v1/ai/generate-post",
+        json={"prompt": "Why SQLite in production is awesome", "tone": selected_tone},
+    )
+    assert unauth_gen.status_code == 401
+
+    # Test generate-post with auth (200)
+    gen_res = client.post(
+        "/api/v1/ai/generate-post",
+        json={
+            "prompt": "Why SQLite in production is awesome",
+            "tone": selected_tone,
+            "existing_categories": ["Technology", "Architecture"],
+        },
+        headers=headers,
+    )
+    assert gen_res.status_code == 200
+    gen_data = gen_res.json()
+    assert "title" in gen_data and len(gen_data["title"]) >= 5
+    assert "summary" in gen_data and len(gen_data["summary"]) >= 10
+    assert "body" in gen_data and len(gen_data["body"]) >= 50
+    assert "##" in gen_data["body"]  # Verify formatted markdown
+    assert isinstance(gen_data["tags"], list)
+    assert len(gen_data["tags"]) >= 1
+    assert gen_data["category"] in ["Technology", "Architecture"]
