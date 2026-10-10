@@ -164,7 +164,8 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
                     response_schema=response_schema,
                 ),
             )
-            return _clean_json_text(response.text)
+            parsed = _clean_json_text(response.text)
+            return parsed, model_name
         except Exception as exc:
             last_exc = exc
             err_str = str(exc).lower()
@@ -185,7 +186,8 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
                             response_mime_type="application/json",
                         ),
                     )
-                    return _clean_json_text(response.text)
+                    parsed = _clean_json_text(response.text)
+                    return parsed, model_name
                 except Exception:
                     pass
             raise exc
@@ -324,7 +326,8 @@ def suggest_tones(
                 "Give each tone a punchy 2-4 word title and a 1-sentence rationale explaining the perspective."
             )
             prompt_content = f"Topic Depiction: {request.prompt}"
-            data = _generate_with_gemini(api_key, prompt_content, system_instruction, SuggestTonesResponse)
+            data, used_model = _generate_with_gemini(api_key, prompt_content, system_instruction, SuggestTonesResponse)
+            data["model_used"] = used_model
             return SuggestTonesResponse(**data)
         except Exception as exc:
             logger.error("Gemini suggest-tones failed: %s", exc)
@@ -337,7 +340,7 @@ def suggest_tones(
     is_test = "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("TESTING") == "1"
     if is_test:
         tones = _suggest_tones_fallback(request.prompt)
-        return SuggestTonesResponse(topic=request.prompt, tones=tones)
+        return SuggestTonesResponse(topic=request.prompt, tones=tones, model_used="mock-fallback")
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -379,7 +382,8 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
    - Body: In-depth markdown article (50 to 100,000 characters).
 """
             user_prompt = f"Topic / Depiction: {request.prompt}\nChosen Tone: {request.tone}"
-            data = _generate_with_gemini(api_key, user_prompt, system_instruction, GeneratedPostResponse)
+            data, used_model = _generate_with_gemini(api_key, user_prompt, system_instruction, GeneratedPostResponse)
+            data["model_used"] = used_model
 
             # Defensive sanitization ensuring limits are never breached
             if "title" in data and isinstance(data["title"], str):
@@ -410,7 +414,9 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
     # In automated test suites, allow mock fallback
     is_test = "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("TESTING") == "1"
     if is_test:
-        return _generate_post_fallback(request.prompt, request.tone, request.existing_categories)
+        fb = _generate_post_fallback(request.prompt, request.tone, request.existing_categories)
+        fb.model_used = "mock-fallback"
+        return fb
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

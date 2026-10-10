@@ -531,3 +531,61 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
 .ai-filled-glow {
   animation: flashGlow 1.2s ease-out;
 }
+
+/* Gemini Icon Smooth Spin & Model Pill */
+@keyframes geminiSmoothSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.gemini-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.gemini-icon.spinning {
+  animation: geminiSmoothSpin 2.4s linear infinite;
+}
+.ai-status-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ai-status {
+  font-size: 13.5px;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.ai-model-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.ai-model-pill.fallback {
+  border-color: #E2A03F;
+  color: #D97706;
+}
+.ai-model-pill.fallback .dot {
+  background: #E2A03F;
+}
+

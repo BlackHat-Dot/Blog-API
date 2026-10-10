@@ -3183,7 +3183,8 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
                     response_schema=response_schema,
                 ),
             )
-            return _clean_json_text(response.text)
+            parsed = _clean_json_text(response.text)
+            return parsed, model_name
         except Exception as exc:
             last_exc = exc
             err_str = str(exc).lower()
@@ -3204,7 +3205,8 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
                             response_mime_type="application/json",
                         ),
                     )
-                    return _clean_json_text(response.text)
+                    parsed = _clean_json_text(response.text)
+                    return parsed, model_name
                 except Exception:
                     pass
             raise exc
@@ -3343,7 +3345,8 @@ def suggest_tones(
                 "Give each tone a punchy 2-4 word title and a 1-sentence rationale explaining the perspective."
             )
             prompt_content = f"Topic Depiction: {request.prompt}"
-            data = _generate_with_gemini(api_key, prompt_content, system_instruction, SuggestTonesResponse)
+            data, used_model = _generate_with_gemini(api_key, prompt_content, system_instruction, SuggestTonesResponse)
+            data["model_used"] = used_model
             return SuggestTonesResponse(**data)
         except Exception as exc:
             logger.error("Gemini suggest-tones failed: %s", exc)
@@ -3356,7 +3359,7 @@ def suggest_tones(
     is_test = "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("TESTING") == "1"
     if is_test:
         tones = _suggest_tones_fallback(request.prompt)
-        return SuggestTonesResponse(topic=request.prompt, tones=tones)
+        return SuggestTonesResponse(topic=request.prompt, tones=tones, model_used="mock-fallback")
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -3398,7 +3401,8 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
    - Body: In-depth markdown article (50 to 100,000 characters).
 """
             user_prompt = f"Topic / Depiction: {request.prompt}\nChosen Tone: {request.tone}"
-            data = _generate_with_gemini(api_key, user_prompt, system_instruction, GeneratedPostResponse)
+            data, used_model = _generate_with_gemini(api_key, user_prompt, system_instruction, GeneratedPostResponse)
+            data["model_used"] = used_model
 
             # Defensive sanitization ensuring limits are never breached
             if "title" in data and isinstance(data["title"], str):
@@ -3429,7 +3433,9 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
     # In automated test suites, allow mock fallback
     is_test = "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("TESTING") == "1"
     if is_test:
-        return _generate_post_fallback(request.prompt, request.tone, request.existing_categories)
+        fb = _generate_post_fallback(request.prompt, request.tone, request.existing_categories)
+        fb.model_used = "mock-fallback"
+        return fb
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -4772,6 +4778,7 @@ class SuggestTonesRequest(BaseModel):
 class SuggestTonesResponse(BaseModel):
     topic: str
     tones: list[ToneSuggestion]
+    model_used: str | None = Field(None, description="The Gemini model that fulfilled the request")
 
 
 class GeneratePostRequest(BaseModel):
@@ -4787,6 +4794,7 @@ class GeneratedPostResponse(BaseModel):
     body: str = Field(..., min_length=50, max_length=100000)
     category: str | None = Field(None, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=15)
+    model_used: str | None = Field(None, description="The Gemini model that fulfilled the request")
 
 
 === FILE: .\app\schemas\category.py ===
@@ -7657,6 +7665,64 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
   animation: flashGlow 1.2s ease-out;
 }
 
+/* Gemini Icon Smooth Spin & Model Pill */
+@keyframes geminiSmoothSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.gemini-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.gemini-icon.spinning {
+  animation: geminiSmoothSpin 2.4s linear infinite;
+}
+.ai-status-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ai-status {
+  font-size: 13.5px;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-family: var(--mono);
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.ai-model-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.ai-model-pill.fallback {
+  border-color: #E2A03F;
+  color: #D97706;
+}
+.ai-model-pill.fallback .dot {
+  background: #E2A03F;
+}
+
+
 
 === FILE: .\frontend\js\api.js ===
 /* Thin client for the Blog API. */
@@ -8342,7 +8408,12 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
         <div class="ai-panel" id="ai-panel">
           <div class="ai-head-row" id="ai-head-toggle">
             <div class="ai-title-wrap">
-              <span class="ai-badge">✨ AI</span>
+              <span class="ai-badge" id="ai-header-badge">
+                <svg class="gemini-icon" id="ai-header-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="currentColor"/>
+                </svg>
+                <span>AI</span>
+              </span>
               <div>
                 <span class="ai-title">Write with AI</span>
                 <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
@@ -8355,7 +8426,18 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
               <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." maxlength="500" autocomplete="off">
               <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
             </div>
-            <p class="ai-status" id="ai-status" hidden></p>
+            <div class="ai-status-row" id="ai-status-row" hidden>
+              <div class="ai-status" id="ai-status">
+                <svg class="gemini-icon spinning" id="ai-status-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="var(--accent)"/>
+                </svg>
+                <span id="ai-status-text">Thinking...</span>
+              </div>
+              <div class="ai-model-pill" id="ai-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-model-name">gemini-2.5-flash</span>
+              </div>
+            </div>
             <div class="ai-tones-section" id="ai-tones-section" hidden>
               <div class="ai-tones-header">
                 <span>Suggested tones for this depiction:</span>
@@ -8456,13 +8538,54 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
     const aiBody = $('#ai-body', f);
     const aiTopicIn = $('#ai-topic-in', f);
     const aiTonesBtn = $('#ai-tones-btn', f);
+    const aiStatusRow = $('#ai-status-row', f);
     const aiStatus = $('#ai-status', f);
+    const aiStatusGemini = $('#ai-status-gemini', f);
+    const aiStatusText = $('#ai-status-text', f);
+    const aiModelPill = $('#ai-model-pill', f);
+    const aiModelName = $('#ai-model-name', f);
+    const aiHeaderGemini = $('#ai-header-gemini', f);
     const aiTonesSection = $('#ai-tones-section', f);
     const aiTonesGrid = $('#ai-tones-grid', f);
     const aiCustomToneIn = $('#ai-custom-tone-in', f);
     const aiWriteBtn = $('#ai-write-btn', f);
 
     let selectedTone = '';
+
+    const showAiLoading = (message) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.hidden = false;
+      aiStatusGemini.classList.add('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.add('spinning');
+      aiStatusText.textContent = message;
+      aiModelPill.hidden = true;
+    };
+
+    const showAiSuccess = (message, modelUsed) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = false;
+      aiStatusText.textContent = message;
+      if (modelUsed) {
+        aiModelName.textContent = modelUsed;
+        aiModelPill.hidden = false;
+        if (modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock')) {
+          aiModelPill.classList.add('fallback');
+        } else {
+          aiModelPill.classList.remove('fallback');
+        }
+      }
+    };
+
+    const showAiError = (errMessage) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = true;
+      aiStatusText.textContent = errMessage;
+      aiModelPill.hidden = true;
+    };
 
     const clearEditorFields = () => {
       title.value = '';
@@ -8537,8 +8660,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
         return;
       }
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = '✨ Analyzing your depiction and discovering tailored tones...';
+      showAiLoading('Analyzing your depiction and discovering tailored tones...');
       aiTonesSection.hidden = true;
       try {
         const res = await API.suggestTones(topic);
@@ -8574,10 +8696,10 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
           aiWriteBtn.textContent = selectedTone ? `Write in "${selectedTone.slice(0, 18)}..."` : 'Pick a tone';
         };
 
-        aiStatus.hidden = true;
+        showAiSuccess('Tones discovered successfully', res.model_used);
         aiTonesSection.hidden = false;
       } catch (err) {
-        aiStatus.textContent = `Could not analyze tones: ${err.message}`;
+        showAiError(`Could not analyze tones: ${err.message}`);
       } finally {
         aiTonesBtn.disabled = false;
       }
@@ -8589,18 +8711,15 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
       if (topic.length < 3) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Topic depiction must be at least 3 characters.';
+        showAiError('Topic depiction must be at least 3 characters.');
         return;
       }
       if (topic.length > 500) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
+        showAiError('Topic depiction must be 500 characters or less.');
         return;
       }
       if (tone.length > 100) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Tone must be 100 characters or less.';
+        showAiError('Tone must be 100 characters or less.');
         return;
       }
 
@@ -8613,8 +8732,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
 
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = `✍️ Writing post with impeccable grammar in "${tone}" tone...`;
+      showAiLoading(`Writing post with thoughtful prose in "${tone}" tone...`);
 
       try {
         const existingCatNames = cats.map((c) => c.name);
@@ -8693,7 +8811,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
           cat.classList.remove('ai-filled-glow');
         }, 1500);
 
-        aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
+        showAiSuccess('Post generated successfully!', res.model_used);
         toast('AI post draft generated!');
         setTimeout(() => {
           aiBody.hidden = true;
@@ -8702,7 +8820,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
           title.focus();
         }, 1200);
       } catch (err) {
-        aiStatus.textContent = `Post generation error: ${err.message}`;
+        showAiError(`Post generation error: ${err.message}`);
       } finally {
         aiWriteBtn.disabled = false;
         aiTonesBtn.disabled = false;

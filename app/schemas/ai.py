@@ -14,6 +14,7 @@ class SuggestTonesRequest(BaseModel):
 class SuggestTonesResponse(BaseModel):
     topic: str
     tones: list[ToneSuggestion]
+    model_used: str | None = Field(None, description="The Gemini model that fulfilled the request")
 
 
 class GeneratePostRequest(BaseModel):
@@ -29,3 +30,4 @@ class GeneratedPostResponse(BaseModel):
     body: str = Field(..., min_length=50, max_length=100000)
     category: str | None = Field(None, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=15)
+    model_used: str | None = Field(None, description="The Gemini model that fulfilled the request")

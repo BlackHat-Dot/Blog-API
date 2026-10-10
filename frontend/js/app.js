@@ -559,7 +559,12 @@
         <div class="ai-panel" id="ai-panel">
           <div class="ai-head-row" id="ai-head-toggle">
             <div class="ai-title-wrap">
-              <span class="ai-badge">✨ AI</span>
+              <span class="ai-badge" id="ai-header-badge">
+                <svg class="gemini-icon" id="ai-header-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="currentColor"/>
+                </svg>
+                <span>AI</span>
+              </span>
               <div>
                 <span class="ai-title">Write with AI</span>
                 <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
@@ -572,7 +577,18 @@
               <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." maxlength="500" autocomplete="off">
               <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
             </div>
-            <p class="ai-status" id="ai-status" hidden></p>
+            <div class="ai-status-row" id="ai-status-row" hidden>
+              <div class="ai-status" id="ai-status">
+                <svg class="gemini-icon spinning" id="ai-status-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="var(--accent)"/>
+                </svg>
+                <span id="ai-status-text">Thinking...</span>
+              </div>
+              <div class="ai-model-pill" id="ai-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-model-name">gemini-2.5-flash</span>
+              </div>
+            </div>
             <div class="ai-tones-section" id="ai-tones-section" hidden>
               <div class="ai-tones-header">
                 <span>Suggested tones for this depiction:</span>
@@ -673,13 +689,54 @@
     const aiBody = $('#ai-body', f);
     const aiTopicIn = $('#ai-topic-in', f);
     const aiTonesBtn = $('#ai-tones-btn', f);
+    const aiStatusRow = $('#ai-status-row', f);
     const aiStatus = $('#ai-status', f);
+    const aiStatusGemini = $('#ai-status-gemini', f);
+    const aiStatusText = $('#ai-status-text', f);
+    const aiModelPill = $('#ai-model-pill', f);
+    const aiModelName = $('#ai-model-name', f);
+    const aiHeaderGemini = $('#ai-header-gemini', f);
     const aiTonesSection = $('#ai-tones-section', f);
     const aiTonesGrid = $('#ai-tones-grid', f);
     const aiCustomToneIn = $('#ai-custom-tone-in', f);
     const aiWriteBtn = $('#ai-write-btn', f);
 
     let selectedTone = '';
+
+    const showAiLoading = (message) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.hidden = false;
+      aiStatusGemini.classList.add('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.add('spinning');
+      aiStatusText.textContent = message;
+      aiModelPill.hidden = true;
+    };
+
+    const showAiSuccess = (message, modelUsed) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = false;
+      aiStatusText.textContent = message;
+      if (modelUsed) {
+        aiModelName.textContent = modelUsed;
+        aiModelPill.hidden = false;
+        if (modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock')) {
+          aiModelPill.classList.add('fallback');
+        } else {
+          aiModelPill.classList.remove('fallback');
+        }
+      }
+    };
+
+    const showAiError = (errMessage) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = true;
+      aiStatusText.textContent = errMessage;
+      aiModelPill.hidden = true;
+    };
 
     const clearEditorFields = () => {
       title.value = '';
@@ -754,8 +811,7 @@
         return;
       }
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = '✨ Analyzing your depiction and discovering tailored tones...';
+      showAiLoading('Analyzing your depiction and discovering tailored tones...');
       aiTonesSection.hidden = true;
       try {
         const res = await API.suggestTones(topic);
@@ -791,10 +847,10 @@
           aiWriteBtn.textContent = selectedTone ? `Write in "${selectedTone.slice(0, 18)}..."` : 'Pick a tone';
         };
 
-        aiStatus.hidden = true;
+        showAiSuccess('Tones discovered successfully', res.model_used);
         aiTonesSection.hidden = false;
       } catch (err) {
-        aiStatus.textContent = `Could not analyze tones: ${err.message}`;
+        showAiError(`Could not analyze tones: ${err.message}`);
       } finally {
         aiTonesBtn.disabled = false;
       }
@@ -806,18 +862,15 @@
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
       if (topic.length < 3) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Topic depiction must be at least 3 characters.';
+        showAiError('Topic depiction must be at least 3 characters.');
         return;
       }
       if (topic.length > 500) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
+        showAiError('Topic depiction must be 500 characters or less.');
         return;
       }
       if (tone.length > 100) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = 'Tone must be 100 characters or less.';
+        showAiError('Tone must be 100 characters or less.');
         return;
       }
 
@@ -830,8 +883,7 @@
 
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = `✍️ Writing post with impeccable grammar in "${tone}" tone...`;
+      showAiLoading(`Writing post with thoughtful prose in "${tone}" tone...`);
 
       try {
         const existingCatNames = cats.map((c) => c.name);
@@ -910,7 +962,7 @@
           cat.classList.remove('ai-filled-glow');
         }, 1500);
 
-        aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
+        showAiSuccess('Post generated successfully!', res.model_used);
         toast('AI post draft generated!');
         setTimeout(() => {
           aiBody.hidden = true;
@@ -919,7 +971,7 @@
           title.focus();
         }, 1200);
       } catch (err) {
-        aiStatus.textContent = `Post generation error: ${err.message}`;
+        showAiError(`Post generation error: ${err.message}`);
       } finally {
         aiWriteBtn.disabled = false;
         aiTonesBtn.disabled = false;
