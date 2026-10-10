@@ -178,11 +178,7 @@
       const line = $('splashLine'), flight = $('splashFlight'), glow = $('splashGlow'), cv = $('splashFx');
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // Play once per browser tab session. To test again, run sessionStorage.clear() in the console.
-      try {
-        if (sessionStorage.getItem('longhand.intro')) { splash.remove(); return; }
-        sessionStorage.setItem('longhand.intro', '1');
-      } catch (e) { /* storage blocked: just play the intro */ }
+      // Plays on every page load, including refresh.
 
       const POSTS = [
         { t: 'On reading slowly',                  m: 'Essay · 6 min' },
