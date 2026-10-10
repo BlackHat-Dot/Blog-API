@@ -1449,8 +1449,15 @@ def _clean_json_text(raw_text: str) -> dict:
     return json.loads(t.strip())
 
 
+def _is_text_model(name: str) -> bool:
+    """Returns True if the model is a standard text generation model (not TTS, Audio, or Image)."""
+    n = name.lower()
+    excluded = ["tts", "audio", "speech", "vision", "image", "imagen", "embed", "realtime", "live"]
+    return not any(ex in n for ex in excluded)
+
+
 def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, response_schema: type) -> dict:
-    """Invokes Google Gemini by dynamically discovering supported models for the API key."""
+    """Invokes Google Gemini by dynamically discovering supported text models for the API key."""
     from google import genai
     from google.genai import types
 
@@ -1463,16 +1470,18 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
             actions = getattr(m, "supported_actions", None) or []
             if not actions or "generateContent" in actions:
                 clean_name = m.name.replace("models/", "")
-                discovered_models.append(clean_name)
+                if _is_text_model(clean_name):
+                    discovered_models.append(clean_name)
     except Exception as list_err:
         logger.warning("Dynamic client.models.list() call failed: %s", list_err)
 
-    # Sort discovered models: prefer flash, then pro, then others
-    flash_models = [m for m in discovered_models if "flash" in m.lower() and "image" not in m.lower() and "embed" not in m.lower()]
-    pro_models = [m for m in discovered_models if "pro" in m.lower() and "embed" not in m.lower()]
-    other_models = [m for m in discovered_models if m not in flash_models and m not in pro_models]
+    # Sort text models: prioritize standard flash, then preview flash, then pro
+    standard_flash = [m for m in discovered_models if "flash" in m.lower() and "preview" not in m.lower() and "exp" not in m.lower()]
+    preview_flash = [m for m in discovered_models if "flash" in m.lower() and m not in standard_flash]
+    pro_models = [m for m in discovered_models if "pro" in m.lower()]
+    other_models = [m for m in discovered_models if m not in standard_flash and m not in preview_flash and m not in pro_models]
 
-    candidates = flash_models + pro_models + other_models
+    candidates = standard_flash + preview_flash + pro_models + other_models
     if not candidates:
         candidates = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-pro"]
 
@@ -1492,8 +1501,8 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
         except Exception as exc:
             last_exc = exc
             err_str = str(exc).lower()
-            if "not found" in err_str or "404" in err_str or "unsupported" in err_str:
-                logger.info("Model %s returned 404/unsupported, trying next model: %s", model_name, exc)
+            if any(k in err_str for k in ["not found", "404", "unsupported", "modalities", "audio", "invalid_argument"]):
+                logger.info("Model %s incompatible (%s), trying next candidate", model_name, exc)
                 continue
             if "schema" in err_str:
                 try:
