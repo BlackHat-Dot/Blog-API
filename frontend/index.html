@@ -1,664 +1,316 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Longhand</title>
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#F3F4F0">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,300..800;1,7..72,300..800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=20261010_4">
-  <noscript><style>#splash { display: none; }</style></noscript>
-  <style>
-    /* ---- Intro: "Shorthand" is attacked by posts and becomes "Longhand" ----
-       Uses the site's own tokens from styles.css (--paper, --paper-2, --ink, --ink-2,
-       --accent, --line-2, --serif, --sans, --ease).
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Longhand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #151a19;
+    --line: #2a302f;
+    --text: #ecebe6;
+    --muted: #9aa19e;
+    --accent: #d8a8c4;
+    --pad: clamp(20px, 3vw, 56px);
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Inter", system-ui, sans-serif;
+  }
 
-       How it is built:
-       - Posts are thrown from the edges. Each one winds up, then slams in on an arc.
-       - The word is a tiny spring simulation: every hit shoves, tilts and squashes it,
-         then it wobbles back. Hits come faster and harder, and the word starts to tremble.
-       - Each impact bursts into ink, sends out a ring and leaves a faint stain.
-       - The "o" never moves. "Sh" and "rt" roll out, "L" and "ng" roll in.
-       - The ink from the stains is pulled into one drop, which stretches into the accent line. */
+  * { box-sizing: border-box; }
 
-    #splash {
-      position: fixed; inset: 0; z-index: 1000; overflow: hidden;
-      background: var(--paper); color: var(--ink);
-      transition: opacity .9s cubic-bezier(.4, 0, .2, 1), visibility .9s;
-    }
-    #splash.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
+  html, body {
+    margin: 0;
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+  }
 
-    /* Very faint paper grain */
-    #splash::after {
-      content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
-      opacity: .07; mix-blend-mode: multiply;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
+  a { color: inherit; text-decoration: none; }
+  button, input { font: inherit; }
 
-    .splash-stage { position: absolute; inset: 0; display: grid; place-items: center; }
+  /* ---------- Top bar: full width, edge to edge ---------- */
+  .topbar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px var(--pad);
+    border-bottom: 1px solid var(--line);
+  }
 
-    .splash-word {
-      position: relative; z-index: 1;
-      font: 700 clamp(2.6rem, 9vw, 5.2rem)/1 var(--serif);
-      letter-spacing: -.02em; white-space: nowrap;
-      transition: transform 1s var(--ease), filter .8s ease, opacity .8s ease;
-    }
-    #splash.is-done .splash-word { transform: translateY(-.12em) scale(1.035); filter: blur(5px); opacity: 0; }
+  .topbar-left,
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
 
-    /* The physics layer: JS moves, tilts and squashes this every frame */
-    .splash-phys { display: inline-flex; align-items: baseline; will-change: transform; }
+  .logo {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+  }
+  .logo span { color: var(--accent); margin-left: 6px; }
 
-    .ch { display: inline-block; }
+  .nav a {
+    color: var(--muted);
+    font-size: 15px;
+    padding-bottom: 6px;
+  }
+  .nav a.active {
+    color: var(--text);
+    border-bottom: 2px solid var(--text);
+  }
 
-    /* Entrance: letters rise out of a blur, one after another */
-    .splash-word.pre .ch.intro { opacity: 0; transform: translateY(.35em); filter: blur(10px); }
-    .splash-word.go .ch.intro {
-      animation: ch-in .95s var(--ease) backwards;
-      animation-delay: calc(var(--k) * 70ms + 120ms);
-    }
-    @keyframes ch-in {
-      from { opacity: 0; transform: translateY(.35em); filter: blur(10px); }
-      to   { opacity: 1; transform: none; filter: blur(0); }
-    }
-    /* After the change, "hand" nods once as the new letters land */
-    .splash-word.wave .tail .ch.intro { animation: ch-wave .8s var(--ease) calc(.95s + var(--i) * 60ms) backwards; }
-    @keyframes ch-wave { 0%, 100% { transform: none; } 40% { transform: translateY(-.07em); } }
+  .btn {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .btn-write {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #151a19;
+    font-weight: 600;
+  }
 
-    /* Segments: "Sh" -> "L" and "rt" -> "ng". Letters roll like an odometer. */
-    .seg {
-      position: relative; display: inline-block; white-space: nowrap;
-      transition: width 1.2s var(--ease);
-    }
-    .seg-clip { clip-path: inset(-.12em -.06em -.3em -.06em); }
-    .stack { display: inline-block; }
-    .stack.new { position: absolute; left: 0; top: 0; }
+  /* ---------- Page: sidebar left, feed middle, sort right ---------- */
+  .layout {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: clamp(32px, 4vw, 80px);
+    padding: 40px var(--pad);
+  }
 
-    .stack.old .ch {
-      transition:
-        transform .7s cubic-bezier(.6, 0, .9, .4) calc(var(--i) * 60ms),
-        opacity .4s ease calc(var(--i) * 60ms + .15s),
-        filter .5s ease calc(var(--i) * 60ms);
-    }
-    .is-long .stack.old .ch { transform: translateY(-140%) rotate(-10deg); opacity: 0; filter: blur(5px); }
+  .sidebar { width: 100%; }
 
-    .stack.new .ch {
-      transform: translateY(140%) rotate(8deg); opacity: 0; filter: blur(5px);
-      transition:
-        transform .95s cubic-bezier(.2, 1.35, .4, 1) calc(.3s + var(--i) * 80ms),
-        opacity .4s ease calc(.3s + var(--i) * 80ms),
-        filter .6s ease calc(.3s + var(--i) * 80ms);
-    }
-    .is-long .stack.new .ch { transform: none; opacity: 1; filter: blur(0); }
+  .search {
+    width: 100%;
+    padding: 12px 14px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+  }
+  .search::placeholder { color: var(--muted); }
 
-    /* The accent line: ink drops in as a dot, then stretches into the brand's line */
-    .splash-line {
-      display: inline-block; width: 3px; height: 3px; border-radius: 50%;
-      margin-left: .35em; margin-bottom: .22em;
-      background: var(--accent); opacity: 0; transform: scale(0);
-      transition:
-        transform .55s cubic-bezier(.3, 1.9, .5, 1),
-        opacity .2s ease,
-        width 1s cubic-bezier(.3, 1.45, .5, 1),
-        border-radius 1s var(--ease);
-    }
-    .splash-line.is-dot { opacity: 1; transform: scale(1); }
-    .splash-line.is-on { width: 18px; border-radius: 2px; }
+  .side-title {
+    margin: 32px 0 12px;
+    font-size: 14px;
+    color: var(--muted);
+  }
 
-    /* The "why", said once in the middle after the posts land: short notes vs long reads */
-    /* The glyphs only (no accent dot), so the caption centres under the visible word */
-    .splash-text { position: relative; display: inline-block; }
-    .splash-note {
-      position: absolute; left: 50%; top: calc(100% + clamp(.9rem, 2.6vw, 1.5rem));
-      margin: 0; z-index: 1; pointer-events: none;
-      display: flex; flex-direction: column; align-items: center; gap: .35rem;
-      font: italic 400 clamp(.95rem, 2.2vw, 1.2rem)/1.35 var(--serif);
-      color: var(--ink-2); text-align: center; white-space: nowrap;
-      letter-spacing: normal; /* the headline's tight tracking would otherwise be inherited */
-      opacity: 0; filter: blur(6px); transform: translate(-50%, .45em);
-      transition: opacity 1s var(--ease), filter 1s var(--ease), transform 1s var(--ease);
-    }
-    .splash-note span:last-child { color: var(--accent); }
-    .splash-note.on { opacity: 1; filter: blur(0); transform: translate(-50%, 0); }
+  .categories { list-style: none; margin: 0; padding: 0; }
+  .categories li a {
+    display: block;
+    padding: 8px 12px;
+    color: #d6d8d4;
+    font-size: 15px;
+    border-left: 2px solid transparent;
+  }
+  .categories li a.active {
+    color: var(--text);
+    font-weight: 600;
+    border-left-color: var(--accent);
+  }
 
-    .splash-flight { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
-    #splashFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 14px;
+    color: var(--muted);
+  }
 
-    /* A post, as it appears on the blog: small label, serif title, accent edge */
-    .splash-slip {
-      position: absolute; left: 50%; top: 50%; opacity: 0;
-      display: flex; flex-direction: column; gap: .2rem;
-      max-width: min(300px, 78vw); padding: .62rem .95rem .68rem 1.05rem;
-      background: var(--paper-2); color: var(--ink-2);
-      border: 1px solid var(--line-2); border-radius: 3px;
-      box-shadow: inset 2px 0 0 var(--accent), 0 18px 32px -16px rgba(0, 0, 0, .28), 0 2px 6px rgba(0, 0, 0, .05);
-      will-change: transform, opacity;
-    }
-    .slip-meta { font: 600 .6rem/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
-    .slip-title { font: 500 1.02rem/1.25 var(--serif); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed { width: 100%; min-width: 0; }
 
-    @media (prefers-reduced-motion: reduce) {
-      .splash-flight, #splashFx { display: none; }
-      .splash-word, .seg, .splash-line, #splash, .stack .ch, .splash-note { transition: none; }
-      .splash-word.go .ch.intro, .splash-word.wave .tail .ch.intro { animation: none; }
-    }
-  </style>
+  .feed-header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 24px;
+    margin-bottom: 8px;
+    font-size: 15px;
+  }
+  .feed-header a { color: var(--muted); padding-bottom: 6px; }
+  .feed-header a.active {
+    color: var(--text);
+    border-bottom: 2px solid var(--text);
+  }
+
+  /* ---------- Posts: use the whole middle column ---------- */
+  .post {
+    width: 100%;
+    padding: 28px 0;
+    border-top: 1px solid var(--line);
+  }
+  .post .bar {
+    width: 60px;
+    height: 3px;
+    background: var(--text);
+    margin-bottom: 20px;
+  }
+  .post.featured .bar { background: var(--accent); }
+
+  .post h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.3rem, 1.8vw, 1.9rem);
+    line-height: 1.15;
+    margin: 0 0 12px;
+  }
+  .post.featured h2 { font-size: clamp(1.7rem, 2.4vw, 2.4rem); }
+  .post h2 a:hover { text-decoration: underline; }
+
+  .post p {
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    line-height: 1.5;
+    color: #d8d9d3;
+    margin: 0 0 18px;
+    max-width: none;
+  }
+
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .meta .author { color: var(--text); font-weight: 600; }
+  .meta .info { display: flex; gap: 16px; }
+  .meta .actions { display: flex; gap: 12px; }
+  .meta .actions a { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- Responsive: stack on small screens ---------- */
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .topbar { flex-wrap: wrap; gap: 16px; }
+  }
+</style>
 </head>
 <body>
-  <div id="splash" aria-hidden="true">
-    <div class="splash-stage">
-      <div class="splash-word pre" id="splashWord">
-        <div class="splash-phys" id="splashPhys">
-          <span class="splash-text" id="splashText"><span class="seg seg-clip" id="segA"></span><span class="seg" id="segO"></span><span class="seg seg-clip" id="segB"></span><span class="tail" id="splashTail"></span><p class="splash-note" id="splashNote" aria-hidden="true"><span>Short isn’t always enough.</span></p></span><span class="splash-line" id="splashLine"></span>
-        </div>
-      </div>
-      <div class="splash-flight" id="splashFlight"></div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo">Longhand<span>—</span></div>
+      <nav class="nav">
+        <a class="active" href="#">Read</a>
+      </nav>
+      <nav class="nav">
+        <a href="#">Saved</a>
+      </nav>
+      <nav class="nav">
+        <a href="#">Profile</a>
+      </nav>
     </div>
-    <canvas id="splashFx"></canvas>
+    <div class="topbar-right">
+      <button class="btn btn-write">Write</button>
+      <button class="btn">vijaykumar</button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+      <input class="search" type="search" placeholder="Search posts">
+
+      <h3 class="side-title">Categories</h3>
+      <ul class="categories">
+        <li><a class="active" href="#">All posts</a></li>
+        <li><a href="#">Database</a></li>
+        <li><a href="#">Ecology</a></li>
+        <li><a href="#">Mindfulness</a></li>
+        <li><a href="#">New</a></li>
+        <li><a href="#">Technology</a></li>
+      </ul>
+
+      <h3 class="side-title">Topics</h3>
+      <div class="tags">
+        <a href="#">api</a><a href="#">architecture</a><a href="#">autopoiesis</a>
+        <a href="#">backend</a><a href="#">caching</a><a href="#">clarity</a>
+        <a href="#">cleancode</a><a href="#">complexity</a>
+        <a href="#">database</a><a href="#">databases</a><a href="#">design</a>
+        <a href="#">devops</a><a href="#">ecology</a><a href="#">events</a>
+        <a href="#">focus</a><a href="#">habits</a><a href="#">indexing</a>
+        <a href="#">journaling</a><a href="#">kafka</a><a href="#">lifestyle</a>
+      </div>
+    </aside>
+
+    <main class="feed">
+      <div class="feed-header">
+        <a class="active" href="#">Latest</a>
+        <a href="#">Most liked</a>
+      </div>
+
+      <article class="post featured">
+        <div class="bar"></div>
+        <h2><a href="#">Building High-Throughput Event Streams</a></h2>
+        <p>Architecting event-driven architectures with partitioned queues and offset tracking.</p>
+        <div class="meta">
+          <div class="info">
+            <span class="author">vijaykumar</span>
+            <span>10 Oct 2026</span>
+            <span>1 min read</span>
+          </div>
+          <div class="actions"><a href="#">Edit</a><a href="#">Delete</a></div>
+        </div>
+      </article>
+
+      <article class="post">
+        <div class="bar"></div>
+        <h2><a href="#">Crafting Clean Code with Simplicity</a></h2>
+        <p>Why the best software designs prioritize readability and maintainability over cleverness.</p>
+        <div class="meta">
+          <div class="info">
+            <span class="author">vijaykumar</span>
+            <span>10 Oct 2026</span>
+            <span>1 min read</span>
+          </div>
+          <div class="actions"><a href="#">Edit</a><a href="#">Delete</a></div>
+        </div>
+      </article>
+
+      <article class="post">
+        <div class="bar"></div>
+        <h2><a href="#">Reforestation and Soil Regeneration</a></h2>
+        <p>Examining how native flora restoration revitalizes depleted agricultural lands.</p>
+        <div class="meta">
+          <div class="info">
+            <span class="author">vijaykumar</span>
+            <span>10 Oct 2026</span>
+            <span>1 min read</span>
+          </div>
+          <div class="actions"><a href="#">Edit</a><a href="#">Delete</a></div>
+        </div>
+      </article>
+
+      <article class="post">
+        <div class="bar"></div>
+        <h2><a href="#">Zero-Downtime Database Migrations</a></h2>
+        <p>Techniques for altering large production tables without locking reads or writes.</p>
+        <div class="meta">
+          <div class="info">
+            <span class="author">vijaykumar</span>
+            <span>10 Oct 2026</span>
+            <span>1 min read</span>
+          </div>
+          <div class="actions"><a href="#">Edit</a><a href="#">Delete</a></div>
+        </div>
+      </article>
+    </main>
+
   </div>
 
-  <a class="skip" href="#main" data-skip>Skip to content</a>
-  <div id="progress" aria-hidden="true"></div>
-  <header class="bar" id="bar"></header>
-  <main id="main" tabindex="-1"></main>
-  <footer class="foot" id="foot"></footer>
-  <div id="toasts" role="status" aria-live="polite"></div>
-  <dialog id="dlg"></dialog>
-
-  <noscript><p style="padding:24px">This site needs JavaScript to run.</p></noscript>
-
-  <script>
-    (function () {
-      const $ = (id) => document.getElementById(id);
-      const splash = $('splash');
-      if (!splash) return;
-
-      const main = $('main'), word = $('splashWord'), phys = $('splashPhys');
-      const segA = $('segA'), segO = $('segO'), segB = $('segB'), tail = $('splashTail');
-      const line = $('splashLine'), flight = $('splashFlight'), cv = $('splashFx'), note = $('splashNote');
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      // Plays on every page load, including refresh.
-
-      const POSTS = [
-        { t: 'On reading slowly',                  m: 'Essay · 6 min' },
-        { t: 'Why I rewrote the parser',           m: 'Engineering · 9 min' },
-        { t: 'Notes from a long train ride',       m: 'Journal · 5 min' },
-        { t: 'Plain HTML, again',                  m: 'Web · 4 min' },
-        { t: 'A letter to my future self',         m: 'Letters · 3 min' },
-        { t: 'Caching without the drama',          m: 'Engineering · 8 min' },
-        { t: 'Tea, rain and a half-written draft', m: 'Journal · 4 min' },
-        { t: 'The case for boring tools',          m: 'Essay · 7 min' },
-        { t: 'Field notes on deadlines',           m: 'Notes · 3 min' },
-        { t: 'Recipe: a simple dal',               m: 'Kitchen · 6 min' },
-        { t: 'Reading list, autumn',               m: 'Lists · 2 min' }
-      ];
-
-      // ---- Timeline (ms). Posts come faster and faster, so the pressure builds. ----
-      const FIRE_AT = [800, 1280, 1700, 2060, 2360, 2600]; // when each post is thrown
-      const FLIGHT  = [1500, 1440, 1380, 1320, 1260, 1200]; // how long each one flies
-      const COUNT = FIRE_AT.length;
-      const MORPH_AT = FIRE_AT[COUNT - 1] + FLIGHT[COUNT - 1] + 380; // a beat after the last hit
-      const GATHER_AFTER = 350;  // ink starts flowing toward the dot this long after the change
-
-      let contentReady = false;
-      let sequenceDone = false;
-      let finished = false;
-      let stopped = false;
-
-      // "Ready" means the app has put something into #main.
-      // If app.js writes a loading message there first, change this to look for the first post element.
-      const isReady = () => main.childNodes.length > 0;
-
-      function finish() {
-        if (finished || !contentReady || !sequenceDone) return;
-        finished = true;
-        splash.classList.add('is-done');
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('resize', resize);
-        setTimeout(() => { stopped = true; splash.remove(); }, 1000);
-      }
-
-      if (isReady()) {
-        contentReady = true;
-      } else {
-        const obs = new MutationObserver(() => {
-          if (isReady()) { contentReady = true; obs.disconnect(); finish(); }
-        });
-        obs.observe(main, { childList: true });
-      }
-
-      // Safety net: never trap a visitor behind the intro if something fails.
-      setTimeout(() => { contentReady = true; sequenceDone = true; finish(); }, 12000);
-
-      // ---- Build the word out of letters ----
-      const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
-      const letters = (text, intro) => {
-        const f = document.createDocumentFragment();
-        [...text].forEach((c, i) => {
-          const s = mk('span', 'ch' + (intro ? ' intro' : ''));
-          s.style.setProperty('--i', i);
-          s.textContent = c;
-          f.appendChild(s);
-        });
-        return f;
-      };
-      const stack = (text, kind, intro) => { const s = mk('span', 'stack ' + kind); s.appendChild(letters(text, intro)); return s; };
-
-      // S h [o] r t   ->   L [o] n g.  The "o" is shared, so it never moves.
-      segA.append(stack('Sh', 'old', true), stack('L', 'new'));
-      segO.append(letters('o', true));
-      segB.append(stack('rt', 'old', true), stack('ng', 'new'));
-      tail.append(letters('hand', true));
-      phys.querySelectorAll('.ch.intro').forEach((c, k) => c.style.setProperty('--k', k));
-
-      // ---- Helpers ----
-      const rand = (a, b) => a + Math.random() * (b - a);
-      const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-      const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-      const easeInOut = (t) => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-      // Wind up a little, then accelerate hard into the target
-      const throwEase = (p) => .7 * (2 * p * p * p - p * p) + .3 * p * p;
-
-      function shuffle(a) {
-        a = a.slice();
-        for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-        return a;
-      }
-
-      // Read a design token as a real colour the canvas can use, whatever format it is written in
-      function cssColor(name, fallback) {
-        const t = document.createElement('i');
-        t.style.color = 'var(' + name + ', ' + fallback + ')';
-        splash.appendChild(t);
-        const c = getComputedStyle(t).color;
-        t.remove();
-        return c;
-      }
-
-      // ---- Canvas: ink, rings and stains ----
-      const ctx = reduce ? null : cv.getContext('2d');
-      let W = window.innerWidth, H = window.innerHeight, dpr = 1;
-      function resize() {
-        if (!ctx) return;
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
-        W = window.innerWidth; H = window.innerHeight;
-        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      let INK = '#222', ACC = '#888';
-
-      const slips = [], dots = [], rings = [], stains = [], hitPts = [];
-      let clock = 0, hits = 0, energy = 0, gatherLeft = 0, tensionTarget = 0, tension = 0;
-      const todo = [];
-      const at = (t, fn) => todo.push({ t, fn });
-
-      // Pointer: the word leans toward the cursor, very slightly
-      let ptx = 0, pty = 0, pxs = 0, pys = 0;
-      function onMove(e) { ptx = e.clientX / W * 2 - 1; pty = e.clientY / H * 2 - 1; }
-
-      // ---- The word's body: a few springs ----
-      const P = { x: 0, y: 0, vx: 0, vy: 0, rot: 0, vrot: 0, sx: 0, vsx: 0, sy: 0, vsy: 0 };
-      const K = 130, C = 6.6;    // position and tilt
-      const KS = 160, CS = 9;    // squash and stretch
-
-      function kick(dx, dy, rx, ry, power) {
-        P.vx += dx * power * 150;
-        P.vy += dy * power * 120;
-        P.vrot += (rx * dy - ry * dx) * .12 * power;   // a hit off-centre also twists the word
-        const k = .5 * power;                          // squash along the hit, bulge across it
-        P.vsx += -Math.abs(dx) * k + Math.abs(dy) * k * .45;
-        P.vsy += -Math.abs(dy) * k + Math.abs(dx) * k * .45;
-      }
-
-      function updatePhys(dt) {
-        const n = 2, h = dt / n;
-        for (let s = 0; s < n; s++) {
-          P.vx += (-K * P.x - C * P.vx) * h;       P.x += P.vx * h;
-          P.vy += (-K * P.y - C * P.vy) * h;       P.y += P.vy * h;
-          P.vrot += (-K * P.rot - C * P.vrot) * h; P.rot += P.vrot * h;
-          P.vsx += (-KS * P.sx - CS * P.vsx) * h;  P.sx += P.vsx * h;
-          P.vsy += (-KS * P.sy - CS * P.vsy) * h;  P.sy += P.vsy * h;
-        }
-        P.x = clamp(P.x, -40, 40); P.y = clamp(P.y, -34, 34); P.rot = clamp(P.rot, -6, 6);
-        P.sx = clamp(P.sx, -.14, .14); P.sy = clamp(P.sy, -.14, .14);
-
-        const f = Math.min(1, dt * 3);
-        pxs += (ptx - pxs) * f; pys += (pty - pys) * f;
-        tension += (tensionTarget - tension) * Math.min(1, dt * 2);
-
-        const t = clock / 1000;
-        const bob = Math.sin(t * 1.7) * 1.6;           // it breathes while it waits
-        const tr = tension * 1.1;                      // and trembles as the hits pile up
-        const x = P.x + pxs * 6 + (tr ? (Math.random() - .5) * tr * 2 : 0);
-        const y = P.y + bob + pys * 4 + (tr ? (Math.random() - .5) * tr * 2 : 0);
-        phys.style.transform =
-          'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0) rotate(' + P.rot.toFixed(3) + 'deg) scale(' +
-          (1 + P.sx).toFixed(4) + ',' + (1 + P.sy).toFixed(4) + ')';
-
-        energy *= Math.exp(-dt * 2.4);
-      }
-
-      // ---- Posts ----
-      function fireSlip(i) {
-        const post = picks[i];
-        const el = mk('div', 'splash-slip');
-        const m = mk('span', 'slip-meta'); m.textContent = post.m;
-        const t = mk('span', 'slip-title'); t.textContent = post.t;
-        el.append(m, t);
-        flight.appendChild(el);
-
-        const r = word.getBoundingClientRect();
-        // Spread the throwing directions around the word so they never clump on one side
-        const ang = i * 2.399 + rand(-.45, .45) + sideBias;
-        const sx = Math.cos(ang) * W * .5, sy = Math.sin(ang) * H * .5;
-        const tx = r.left + r.width * rand(.12, .88) - W / 2;
-        const ty = r.top + r.height * rand(.38, .68) - H / 2;
-        const mx = (sx + tx) / 2, my = (sy + ty) / 2;
-        const dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1;
-        const bend = len * rand(.16, .3) * (i % 2 ? 1 : -1);
-        const cx = mx + (-dy / len) * bend, cy = my + (dx / len) * bend; // the arc's control point
-        const ex = tx - cx, ey = ty - cy, el2 = Math.hypot(ex, ey) || 1;  // direction it hits with
-
-        slips.push({
-          el, i, t0: clock, dur: FLIGHT[i], sx, sy, cx, cy, tx, ty, dx: ex / el2, dy: ey / el2,
-          s0: 1, s1: .46, r0: rand(-12, 12), spin: rand(18, 34) * (Math.random() < .5 ? -1 : 1), ph: rand(0, 6.28)
-        });
-      }
-
-      function updateSlips() {
-        for (let i = slips.length - 1; i >= 0; i--) {
-          const s = slips[i];
-          const p = (clock - s.t0) / s.dur;
-          if (p >= 1) { s.el.remove(); slips.splice(i, 1); impact(s); continue; }
-          const q = throwEase(p), qc = clamp(q), m = 1 - q;
-          const x = m * m * s.sx + 2 * m * q * s.cx + q * q * s.tx;
-          const y = m * m * s.sy + 2 * m * q * s.cy + q * q * s.ty;
-          const sc = s.s0 + (s.s1 - s.s0) * qc;
-          const rot = s.r0 + s.spin * qc + Math.sin(p * 11 + s.ph) * 3.2 * (1 - p); // a flutter in the air
-          const a = clamp(p / .16) * (1 - clamp((p - .96) / .04));
-          s.el.style.opacity = a.toFixed(3);
-          s.el.style.transform =
-            'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) rotate(' +
-            rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')';
-        }
-      }
-
-      // ---- Impact: shove the word, throw ink, ring, stain ----
-      function burst(x, y, dx, dy, n, power) {
-        const base = Math.atan2(-dy, -dx); // ink splashes back the way the post came from
-        for (let k = 0; k < n; k++) {
-          const a = base + rand(-1.15, 1.15), sp = rand(70, 300) * power * .9;
-          dots.push({ kind: 0, x, y, px: x, py: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                      r: rand(.9, 2.6), life: rand(600, 1100), age: 0, col: Math.random() < .72 ? INK : ACC });
-        }
-      }
-
-      function impact(s) {
-        const hx = W / 2 + s.tx, hy = H / 2 + s.ty;
-        const power = 1 + s.i * .22;
-        const r = word.getBoundingClientRect();
-        kick(s.dx, s.dy, hx - (r.left + r.width / 2), hy - (r.top + r.height / 2), power);
-        burst(hx, hy, s.dx, s.dy, 12 + s.i * 2, power);
-        rings.push({ x: hx, y: hy, r0: 4, r1: 56 + s.i * 9, life: 700, age: 0, lw: 1.2, col: INK, a: .22 });
-        stains.push({ x: hx, y: hy, r: rand(14, 24) + s.i * 2, a: .07, life: 3800, age: 0 });
-        hitPts.push({ x: hx, y: hy });
-        hits++;
-        if (hits === COUNT) at(clock + 380, () => note.classList.add('on')); // the why, once the last post has landed
-        tensionTarget = Math.pow(hits / COUNT, 2);
-        energy = Math.min(1, energy + .2);
-      }
-
-      // ---- The change: Short -> Long ----
-      function morph() {
-        tensionTarget = 0;
-
-        // Lock each segment at its current width, then let it slide to the new width
-        [segA, segB].forEach((seg) => { seg.style.width = seg.offsetWidth + 'px'; });
-        void phys.offsetWidth;
-        [segA, segB].forEach((seg) => {
-          seg.style.width = seg.querySelector('.stack.new').offsetWidth + 'px';
-          seg.classList.add('is-long');
-        });
-        word.classList.add('wave');
-
-        // Release: the word pops outward, two shockwaves, a spray of ink
-        P.vsx += 2.2; P.vsy += 2.2;
-        const r = word.getBoundingClientRect();
-        const cx = W / 2, cy = r.top + r.height / 2;
-        const far = Math.min(W, H) * .32;
-        rings.push({ x: cx, y: cy, r0: 10, r1: far, life: 1100, age: 0, lw: 1.6, col: INK, a: .26 });
-        rings.push({ x: cx, y: cy, r0: 6, r1: far * .72, life: 900, age: 0, lw: 1.2, col: ACC, a: .3 });
-        for (let k = 0; k < 26; k++) {
-          const a = rand(0, 6.283), sp = rand(120, 420);
-          dots.push({ kind: 0, x: r.left + r.width * rand(.1, .9), y: cy + rand(-r.height * .25, r.height * .25),
-                      px: cx, py: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * .8,
-                      r: rand(1, 2.8), life: rand(700, 1200), age: 0, col: Math.random() < .7 ? INK : ACC });
-        }
-        energy = 1;
-        at(clock + GATHER_AFTER, gather);
-      }
-
-      // All the ink left behind by the hits is pulled into one drop
-      function gather() {
-        const src = hitPts.length ? hitPts : [{ x: W / 2, y: H / 2 }];
-        const list = [];
-        src.forEach((p) => { for (let k = 0; k < 3; k++) list.push(p); });
-        gatherLeft = list.length;
-        list.forEach((p) => {
-          dots.push({ kind: 1, sx: p.x + rand(-10, 10), sy: p.y + rand(-10, 10), x: p.x, y: p.y, px: p.x, py: p.y,
-                      t: 0, wait: rand(0, 260), dur: rand(600, 850), curve: rand(60, 150) * (Math.random() < .5 ? -1 : 1),
-                      r: rand(1.2, 2), col: Math.random() < .6 ? INK : ACC });
-        });
-        stains.forEach((s) => { s.life = Math.min(s.life, s.age + 700); }); // the stains drain away
-      }
-
-      function arrive(d) {
-        gatherLeft--;
-        rings.push({ x: d.x, y: d.y, r0: 3, r1: 15, life: 500, age: 0, lw: 1, col: ACC, a: .35 });
-        if (!line.classList.contains('is-dot')) line.classList.add('is-dot');
-        energy = Math.min(1, energy + .04);
-        if (gatherLeft <= 0) {
-          line.classList.add('is-on'); // the drop stretches into the brand's line
-          const lr = line.getBoundingClientRect();
-          rings.push({ x: lr.left + 9, y: lr.top + lr.height / 2, r0: 4, r1: 40, life: 800, age: 0, lw: 1.2, col: ACC, a: .4 });
-          energy = Math.max(energy, .5);
-          startFloat();
-        }
-      }
-
-      function drawFx(dt) {
-        ctx.clearRect(0, 0, W, H);
-        const ms = dt * 1000;
-
-        // Stains: faint blots, softened by stacking three circles
-        for (let i = stains.length - 1; i >= 0; i--) {
-          const s = stains[i]; s.age += ms;
-          const a = s.a * (1 - s.age / s.life);
-          if (a <= 0) { stains.splice(i, 1); continue; }
-          ctx.fillStyle = INK;
-          for (let k = 0; k < 3; k++) {
-            ctx.globalAlpha = a / 3;
-            ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (1 - k * .28), 0, 6.2832); ctx.fill();
-          }
-        }
-
-        // Rings
-        ctx.lineCap = 'butt';
-        for (let i = rings.length - 1; i >= 0; i--) {
-          const g = rings[i]; g.age += ms;
-          const pr = g.age / g.life;
-          if (pr >= 1) { rings.splice(i, 1); continue; }
-          ctx.globalAlpha = g.a * Math.pow(1 - pr, 1.2);
-          ctx.strokeStyle = g.col; ctx.lineWidth = g.lw * (1 - pr * .6);
-          ctx.beginPath(); ctx.arc(g.x, g.y, g.r0 + (g.r1 - g.r0) * easeOut(pr), 0, 6.2832); ctx.stroke();
-        }
-
-        // Ink: flying drops are drawn as short streaks along their motion
-        let tx = W / 2, ty = H / 2;
-        if (gatherLeft > 0) { const lr = line.getBoundingClientRect(); tx = lr.left + lr.width / 2; ty = lr.top + lr.height / 2; }
-        ctx.lineCap = 'round';
-        for (let i = dots.length - 1; i >= 0; i--) {
-          const d = dots[i];
-          let a, w;
-          if (d.kind === 0) {
-            d.age += ms;
-            if (d.age >= d.life) { dots.splice(i, 1); continue; }
-            const drag = Math.exp(-dt * 3);
-            d.px = d.x; d.py = d.y;
-            d.vx *= drag; d.vy = d.vy * drag + 170 * dt;
-            d.x += d.vx * dt; d.y += d.vy * dt;
-            const l = d.age / d.life;
-            a = Math.pow(1 - l, 1.4); w = d.r * 2 * (1 - l * .5);
-          } else {
-            if (d.wait > 0) { d.wait -= ms; continue; }
-            d.t += ms / d.dur;
-            if (d.t >= 1) { d.x = tx; d.y = ty; arrive(d); dots.splice(i, 1); continue; }
-            const q = easeInOut(d.t);
-            const vx = tx - d.sx, vy = ty - d.sy, ln = Math.hypot(vx, vy) || 1;
-            const sw = Math.sin(Math.PI * q) * d.curve;           // swirl sideways on the way in
-            d.px = d.x; d.py = d.y;
-            d.x = d.sx + vx * q + (-vy / ln) * sw;
-            d.y = d.sy + vy * q + (vx / ln) * sw;
-            a = .95; w = d.r * 2;
-          }
-          ctx.globalAlpha = a; ctx.strokeStyle = d.col; ctx.lineWidth = w;
-          ctx.beginPath();
-          const tr = d.kind === 0 ? 2.2 : 1.1;
-          ctx.moveTo(d.x - (d.x - d.px) * tr, d.y - (d.y - d.py) * tr);
-          ctx.lineTo(d.x + .01, d.y);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-      }
-
-      // ---- After "Longhand" settles: a few posts drift slowly around it ----
-      // Slow, soft and low-contrast on purpose, so it reads as calm rather than a rush.
-      const FLOAT_TIME = 3400;  // how long the drift lasts before the intro lets go
-      const FLOAT_WIDE = [[-.34, -.30], [.33, -.25], [-.24, .27], [.28, .30], [.02, -.40]];
-      const FLOAT_NARROW = [[0, -.36], [0, -.2], [0, .34]];
-      const floaters = [];
-      let floating = false, floatEnd = 0;
-
-      function startFloat() {
-        const spare = shuffle(POSTS.filter((p) => !picks.includes(p)));
-        const spots = W < 640 ? FLOAT_NARROW : FLOAT_WIDE;
-        const n = Math.min(spots.length, spare.length);
-        const maxX = Math.max(0, W / 2 - 170); // keep cards inside the screen edges
-        for (let i = 0; i < n; i++) {
-          const el = mk('div', 'splash-slip');
-          const m = mk('span', 'slip-meta'); m.textContent = spare[i].m;
-          const t = mk('span', 'slip-title'); t.textContent = spare[i].t;
-          el.append(m, t);
-          flight.appendChild(el);
-          const near = i % 2 === 0; // alternate near and far cards for a little depth
-          if (!near) el.style.filter = 'blur(1.2px)';
-          floaters.push({
-            el,
-            hx: clamp(spots[i][0] * W, -maxX, maxX),
-            hy: spots[i][1] * H,
-            ax: rand(6, 11), ay: rand(6, 12),           // drift amplitude in px
-            fx: rand(.26, .38), fy: rand(.2, .32),      // drift speed in rad/s, slow on purpose
-            ph: rand(0, 6.28), rot: rand(-1.2, 1.2),
-            delay: i * 260,
-            s: near ? 1 : .78, o: near ? .95 : .55,
-            born: clock
-          });
-        }
-        floating = true;
-        floatEnd = clock + FLOAT_TIME;
-        at(floatEnd, endFloat);
-      }
-
-      function updateFloaters() {
-        if (!floaters.length) return;
-        const t = clock / 1000;
-        const out = floating ? 0 : easeInOut(clamp((clock - floatEnd) / 700));
-        for (const f of floaters) {
-          const age = clock - f.born - f.delay;
-          if (age <= 0) { f.el.style.opacity = '0'; continue; }
-          const k = easeOut(clamp(age / 1500));          // eases in from near the centre
-          const g = .35 + .65 * k;
-          const x = f.hx * g + f.ax * Math.sin(t * f.fx + f.ph) * k;
-          const y = f.hy * g + f.ay * Math.sin(t * f.fy + f.ph * 1.3) * k + Math.sin(t * .9 + f.ph) * 1.5 * k;
-          const rot = f.rot + Math.sin(t * .31 + f.ph) * 1.2;
-          const sc = f.s * (.92 + .08 * k) * (1 - out * .06);
-          f.el.style.opacity = (f.o * k * (1 - out)).toFixed(3);
-          f.el.style.transform =
-            'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) rotate(' +
-            rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')';
-        }
-      }
-
-      function endFloat() {
-        floating = false;
-        sequenceDone = true;
-        finish();
-      }
-
-      // ---- The loop. One clock drives everything, so a hidden tab simply pauses the show. ----
-      let last = 0;
-      function tick(now) {
-        if (stopped) return;
-        const dt = last ? Math.min(.05, (now - last) / 1000) : 1 / 60;
-        last = now;
-        clock += dt * 1000;
-        todo.sort((a, b) => a.t - b.t);
-        while (todo.length && todo[0].t <= clock) todo.shift().fn();
-        updateSlips();
-        updateFloaters();
-        updatePhys(dt);
-        drawFx(dt);
-        requestAnimationFrame(tick);
-      }
-
-      let picks = [];
-      let sideBias = 0;
-
-      function start() {
-        word.classList.remove('pre');
-        word.classList.add('go');
-
-        if (reduce) {
-          // No motion: show the finished word, hold a moment, then fade out
-          [segA, segB].forEach((seg) => {
-            seg.style.width = seg.querySelector('.stack.new').offsetWidth + 'px';
-            seg.classList.add('is-long');
-          });
-          line.classList.add('is-dot', 'is-on');
-          note.classList.add('on');
-          setTimeout(() => { sequenceDone = true; finish(); }, 600);
-          return;
-        }
-
-        resize();
-        INK = cssColor('--ink', '#222');
-        ACC = cssColor('--accent', '#8a6f4d');
-        window.addEventListener('resize', resize);
-        window.addEventListener('pointermove', onMove, { passive: true });
-
-        picks = shuffle(POSTS).slice(0, COUNT);
-        sideBias = rand(0, 6.283);
-        for (let i = 0; i < COUNT; i++) at(FIRE_AT[i], () => fireSlip(i));
-        at(MORPH_AT - 190, () => { P.vsx -= 1; P.vsy -= 1; }); // the word draws a breath
-        at(MORPH_AT, morph);
-        requestAnimationFrame(tick);
-      }
-
-      // Measure after the fonts have loaded, so widths are correct
-      const wait = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 2500))]).catch(() => {});
-      const fontsReady = document.fonts && document.fonts.load
-        ? wait(Promise.all([document.fonts.load('700 64px Literata'), document.fonts.load('500 16px "Instrument Sans"')]))
-        : Promise.resolve();
-      fontsReady.then(start);
-    })();
-  </script>
-
-  <script src="config.js?v=20261010_4"></script>
-  <script src="js/md.js?v=20261010_4"></script>
-  <script src="js/api.js?v=20261010_4"></script>
-  <script src="js/app.js?v=20261010_4"></script>
 </body>
 </html>
