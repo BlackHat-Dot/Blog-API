@@ -1501,8 +1501,12 @@ def _generate_with_gemini(api_key: str, prompt: str, system_instruction: str, re
         except Exception as exc:
             last_exc = exc
             err_str = str(exc).lower()
-            if any(k in err_str for k in ["not found", "404", "unsupported", "modalities", "audio", "invalid_argument"]):
-                logger.info("Model %s incompatible (%s), trying next candidate", model_name, exc)
+            if any(k in err_str for k in [
+                "not found", "404", "unsupported", "modalities", "audio",
+                "invalid_argument", "503", "unavailable", "high demand",
+                "overloaded", "resource_exhausted", "429", "rate limit"
+            ]):
+                logger.info("Model %s unavailable or overloaded (%s), trying next candidate", model_name, exc)
                 continue
             if "schema" in err_str:
                 try:
