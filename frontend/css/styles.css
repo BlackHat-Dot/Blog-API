@@ -415,10 +415,10 @@ label, legend { font-weight: 500; }
 .ed-side { align-self: start; position: sticky; top: 24px; }
 .seg { border: 0; padding: 0; margin: 0 0 20px; display: flex; flex-wrap: wrap; }
 .seg legend { margin-bottom: 6px; padding: 0; width: 100%; }
-.seg label { flex: 1; text-align: center; padding: 9px 0; border: 1px solid var(--line-2); font-weight: 500; cursor: pointer; }
+.seg label { position: relative; flex: 1 1 0; min-width: 0; text-align: center; padding: 9px 18px; white-space: nowrap; border: 1px solid var(--line-2); font-weight: 500; cursor: pointer; }
 .seg label:first-of-type { border-radius: 6px 0 0 6px; }
 .seg label:last-of-type { border-radius: 0 6px 6px 0; margin-left: -1px; }
-.seg input { position: absolute; opacity: 0; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
 .seg input:checked + span { color: var(--accent-ink); }
 .seg label:has(input:checked) { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
