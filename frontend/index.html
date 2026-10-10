@@ -180,7 +180,12 @@
       const line = $('splashLine'), flight = $('splashFlight'), cv = $('splashFx'), note = $('splashNote');
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // Plays on every page load, including refresh.
+      // Plays on a visit, not on refresh: once per browser tab session.
+      // To see it again in the same tab, run sessionStorage.clear() in the console.
+      try {
+        if (sessionStorage.getItem('longhand.intro')) { splash.remove(); return; }
+        sessionStorage.setItem('longhand.intro', '1');
+      } catch (e) { /* storage blocked: just play the intro */ }
 
       const POSTS = [
         { t: 'On reading slowly',                  m: 'Essay · 6 min' },
