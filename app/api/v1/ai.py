@@ -380,8 +380,8 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
 5. STRICT FIELD LENGTH LIMITS (MANDATORY):
    - Title: Engaging headline (min 4 words, 5 to 55 characters maximum).
    - Summary: Brief standfirst/description hooking the reader (min 4 words, 10 to 110 characters maximum).
-   - Category: Choose from [{categories_str}] or suggest a fitting name matching the domain (1 to 50 characters).
-   - Tags: 3 to 6 lowercase tags, each 1 to 30 characters maximum (max 15 tags total).
+   - Category: Choose from [{categories_str}] or suggest a fitting name matching the domain (1 to 15 characters maximum).
+   - Tags: 3 to 6 lowercase tags, each 1 to 15 characters maximum (max 15 tags total).
    - Body: In-depth markdown article (50 to 100,000 characters).
 """
             user_prompt = f"Topic / Depiction: {request.prompt}\nChosen Tone: {request.tone}"
@@ -396,12 +396,12 @@ EDITORIAL STANDARDS & DOMAIN ADAPTATION:
             if "body" in data and isinstance(data["body"], str):
                 data["body"] = data["body"][:100000]
             if "category" in data and isinstance(data["category"], str):
-                data["category"] = data["category"].strip()[:50]
+                data["category"] = data["category"].strip()[:15]
             if "tags" in data and isinstance(data["tags"], list):
                 cleaned_tags = []
                 for t in data["tags"]:
                     if isinstance(t, str):
-                        clean_t = re.sub(r"[^a-zA-Z0-9_-]", "", t.strip().lower())[:30]
+                        clean_t = re.sub(r"[^a-zA-Z0-9_-]", "", t.strip().lower())[:15]
                         if clean_t and clean_t not in cleaned_tags:
                             cleaned_tags.append(clean_t)
                 data["tags"] = cleaned_tags[:15]

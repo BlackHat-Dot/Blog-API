@@ -432,8 +432,8 @@ def test_ai_tones_and_post_generation(client):
     bad_topic = client.post("/api/v1/ai/suggest-tones", json={"prompt": long_topic}, headers=headers)
     assert bad_topic.status_code == 422
 
-    # 2. Category > 50 chars -> 422
-    long_cat = client.post("/api/v1/categories", json={"name": "C" * 51}, headers=headers)
+    # 2. Category > 15 chars -> 422
+    long_cat = client.post("/api/v1/categories", json={"name": "C" * 16}, headers=headers)
     assert long_cat.status_code == 422
 
     # 3. Post Title > 55 chars -> 422
@@ -472,13 +472,13 @@ def test_ai_tones_and_post_generation(client):
     )
     assert bad_body.status_code == 422
 
-    # 5. Tag length > 30 chars -> 422
+    # 6. Tag length > 15 chars -> 422
     bad_tag_len = client.post(
         "/api/v1/posts",
         json={
             "title": "Valid Post Title Here",
             "body": "This is a valid body with sufficient characters for testing.",
-            "tags": ["T" * 31],
+            "tags": ["T" * 16],
         },
         headers=headers,
     )

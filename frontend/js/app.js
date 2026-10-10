@@ -632,11 +632,11 @@
             ${cats.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
             <option value="__new__">New category…</option>
           </select>
-          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="50" hidden style="margin-top:8px" aria-label="New category name">
+          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="15" hidden style="margin-top:8px" aria-label="New category name">
         </div>
         <div class="field"><label for="ed-tags">Tags</label>
           <div class="chips" id="chips"></div>
-          <input id="ed-tags" type="text" list="tag-list" maxlength="30" placeholder="Add a tag, then press Enter" autocomplete="off">
+          <input id="ed-tags" type="text" list="tag-list" maxlength="15" placeholder="Add a tag, then press Enter" autocomplete="off">
           <datalist id="tag-list">${tagNames.map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
         </div>
         <p class="stats" id="ed-stats"></p>
@@ -682,7 +682,7 @@
     const addTag = (raw) => {
       const t = raw.trim().toLowerCase().replace(/,+$/, '').trim();
       if (!t) return;
-      if (t.length > 30) { toast('Each tag must be 30 characters or less.'); return; }
+      if (t.length > 15) { toast('Each tag must be 15 characters or less.'); return; }
       if (E.tags.length >= 15) { toast('A post can have at most 15 tags.'); return; }
       if (!E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
       tagIn.value = '';
@@ -1045,13 +1045,15 @@
         if (E.body.length > 100000) { err.textContent = 'Body must be 100,000 characters or less.'; body.focus(); return; }
         if (E.tags.length > 15) { err.textContent = 'A post can have at most 15 tags.'; tagIn.focus(); return; }
         let categoryId = cat.value === '__new__' ? null : cat.value ? Number(cat.value) : null;
-        if (cat.value === '__new__') {
-          const name = newcat.value.trim();
-          if (!name) { err.textContent = 'Name the new category, or pick an existing one.'; newcat.focus(); return; }
-          if (name.length > 50) { err.textContent = 'Category name must be 50 characters or less.'; newcat.focus(); return; }
-          const c = await API.createCategory(name);
-          S.cats = null;
-          categoryId = c.id;
+        if (cat.value === '__new__' || cat.value === '') {
+          if (cat.value === '__new__') {
+            const name = newcat.value.trim();
+            if (!name) { err.textContent = 'Name the new category, or pick an existing one.'; newcat.focus(); return; }
+            if (name.length > 15) { err.textContent = 'Category name must be 15 characters or less.'; newcat.focus(); return; }
+            const c = await API.createCategory(name);
+            S.cats = null;
+            categoryId = c.id;
+          }
         }
         const payload = { title: E.title.trim(), summary: post ? E.summary.trim() : E.summary.trim() || null, body: E.body, category_id: categoryId, tags: E.tags, state: E.state };
         const saved = post ? await API.updatePost(post.id, payload) : await API.createPost(payload);

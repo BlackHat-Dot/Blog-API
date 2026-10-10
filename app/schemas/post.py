@@ -21,8 +21,8 @@ class PostBase(BaseModel):
             if len(tags_list) > 15:
                 raise ValueError("A post can have at most 15 tags")
             for t in tags_list:
-                if len(t.strip()) > 30:
-                    raise ValueError(f"Tag '{t[:15]}...' exceeds the maximum length of 30 characters")
+                if len(t.strip()) > 15:
+                    raise ValueError(f"Tag '{t[:10]}...' exceeds the maximum length of 15 characters")
         return tags_list
 
 
@@ -45,8 +45,8 @@ class PostUpdate(BaseModel):
             if len(tags_list) > 15:
                 raise ValueError("A post can have at most 15 tags")
             for t in tags_list:
-                if len(t.strip()) > 30:
-                    raise ValueError(f"Tag '{t[:15]}...' exceeds the maximum length of 30 characters")
+                if len(t.strip()) > 15:
+                    raise ValueError(f"Tag '{t[:10]}...' exceeds the maximum length of 15 characters")
         return tags_list
 
 
