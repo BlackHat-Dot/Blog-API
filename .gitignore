@@ -11,6 +11,7 @@ instance/
 .python-version
 .env
 .env.*
+!.env.example
 .idea/
 .vscode/
 *.sqlite3
