@@ -31,11 +31,6 @@
     }
     #splash.is-done { opacity: 0; visibility: hidden; pointer-events: none; }
 
-    /* Soft edge shading, so the paper feels lit from the middle */
-    #splash::before {
-      content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse 75% 65% at 50% 48%, transparent 55%, color-mix(in srgb, var(--ink) 7%, transparent) 100%);
-    }
     /* Very faint paper grain */
     #splash::after {
       content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
@@ -44,14 +39,6 @@
     }
 
     .splash-stage { position: absolute; inset: 0; display: grid; place-items: center; }
-
-    /* A warm glow behind the word. It swells with every hit and flares at the change. */
-    .splash-glow {
-      position: absolute; left: 50%; top: 50%; pointer-events: none;
-      width: min(92vw, 860px); aspect-ratio: 2 / 1;
-      transform: translate(-50%, -50%); opacity: 0;
-      background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 11%, transparent), transparent);
-    }
 
     .splash-word {
       position: relative; z-index: 1;
@@ -137,7 +124,7 @@
     .slip-title { font: 500 1.02rem/1.25 var(--serif); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     @media (prefers-reduced-motion: reduce) {
-      .splash-flight, #splashFx, .splash-glow { display: none; }
+      .splash-flight, #splashFx { display: none; }
       .splash-word, .seg, .splash-line, #splash, .stack .ch { transition: none; }
       .splash-word.go .ch.intro, .splash-word.wave .tail .ch.intro { animation: none; }
     }
@@ -146,7 +133,6 @@
 <body>
   <div id="splash" aria-hidden="true">
     <div class="splash-stage">
-      <div class="splash-glow" id="splashGlow"></div>
       <div class="splash-word pre" id="splashWord">
         <div class="splash-phys" id="splashPhys">
           <span class="seg seg-clip" id="segA"></span><span class="seg" id="segO"></span><span class="seg seg-clip" id="segB"></span><span class="tail" id="splashTail"></span><span class="splash-line" id="splashLine"></span>
@@ -175,7 +161,7 @@
 
       const main = $('main'), word = $('splashWord'), phys = $('splashPhys');
       const segA = $('segA'), segO = $('segO'), segB = $('segB'), tail = $('splashTail');
-      const line = $('splashLine'), flight = $('splashFlight'), glow = $('splashGlow'), cv = $('splashFx');
+      const line = $('splashLine'), flight = $('splashFlight'), cv = $('splashFx');
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       // Plays on every page load, including refresh.
@@ -200,7 +186,6 @@
       const COUNT = FIRE_AT.length;
       const MORPH_AT = FIRE_AT[COUNT - 1] + FLIGHT[COUNT - 1] + 380; // a beat after the last hit
       const GATHER_AFTER = 350;  // ink starts flowing toward the dot this long after the change
-      const HOLD = 900;          // how long "Longhand" is held before the intro lets go
 
       let contentReady = false;
       let sequenceDone = false;
@@ -338,9 +323,6 @@
           (1 + P.sx).toFixed(4) + ',' + (1 + P.sy).toFixed(4) + ')';
 
         energy *= Math.exp(-dt * 2.4);
-        const e = Math.min(1, energy);
-        glow.style.opacity = e.toFixed(3);
-        glow.style.transform = 'translate(-50%,-50%) scale(' + (1 + e * .14).toFixed(3) + ')';
       }
 
       // ---- Posts ----
@@ -466,7 +448,7 @@
           const lr = line.getBoundingClientRect();
           rings.push({ x: lr.left + 9, y: lr.top + lr.height / 2, r0: 4, r1: 40, life: 800, age: 0, lw: 1.2, col: ACC, a: .4 });
           energy = Math.max(energy, .5);
-          at(clock + HOLD, () => { sequenceDone = true; finish(); });
+          startFloat();
         }
       }
 
@@ -535,6 +517,70 @@
         ctx.globalAlpha = 1;
       }
 
+      // ---- After "Longhand" settles: a few posts drift slowly around it ----
+      // Slow, soft and low-contrast on purpose, so it reads as calm rather than a rush.
+      const FLOAT_TIME = 3400;  // how long the drift lasts before the intro lets go
+      const FLOAT_WIDE = [[-.34, -.30], [.33, -.25], [-.24, .27], [.28, .30], [.02, -.40]];
+      const FLOAT_NARROW = [[0, -.36], [0, -.2], [0, .34]];
+      const floaters = [];
+      let floating = false, floatEnd = 0;
+
+      function startFloat() {
+        const spare = shuffle(POSTS.filter((p) => !picks.includes(p)));
+        const spots = W < 640 ? FLOAT_NARROW : FLOAT_WIDE;
+        const n = Math.min(spots.length, spare.length);
+        const maxX = Math.max(0, W / 2 - 170); // keep cards inside the screen edges
+        for (let i = 0; i < n; i++) {
+          const el = mk('div', 'splash-slip');
+          const m = mk('span', 'slip-meta'); m.textContent = spare[i].m;
+          const t = mk('span', 'slip-title'); t.textContent = spare[i].t;
+          el.append(m, t);
+          flight.appendChild(el);
+          const near = i % 2 === 0; // alternate near and far cards for a little depth
+          if (!near) el.style.filter = 'blur(1.2px)';
+          floaters.push({
+            el,
+            hx: clamp(spots[i][0] * W, -maxX, maxX),
+            hy: spots[i][1] * H,
+            ax: rand(6, 11), ay: rand(6, 12),           // drift amplitude in px
+            fx: rand(.26, .38), fy: rand(.2, .32),      // drift speed in rad/s, slow on purpose
+            ph: rand(0, 6.28), rot: rand(-1.2, 1.2),
+            delay: i * 260,
+            s: near ? 1 : .78, o: near ? .95 : .55,
+            born: clock
+          });
+        }
+        floating = true;
+        floatEnd = clock + FLOAT_TIME;
+        at(floatEnd, endFloat);
+      }
+
+      function updateFloaters() {
+        if (!floaters.length) return;
+        const t = clock / 1000;
+        const out = floating ? 0 : easeInOut(clamp((clock - floatEnd) / 700));
+        for (const f of floaters) {
+          const age = clock - f.born - f.delay;
+          if (age <= 0) { f.el.style.opacity = '0'; continue; }
+          const k = easeOut(clamp(age / 1500));          // eases in from near the centre
+          const g = .35 + .65 * k;
+          const x = f.hx * g + f.ax * Math.sin(t * f.fx + f.ph) * k;
+          const y = f.hy * g + f.ay * Math.sin(t * f.fy + f.ph * 1.3) * k + Math.sin(t * .9 + f.ph) * 1.5 * k;
+          const rot = f.rot + Math.sin(t * .31 + f.ph) * 1.2;
+          const sc = f.s * (.92 + .08 * k) * (1 - out * .06);
+          f.el.style.opacity = (f.o * k * (1 - out)).toFixed(3);
+          f.el.style.transform =
+            'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%,-50%) rotate(' +
+            rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')';
+        }
+      }
+
+      function endFloat() {
+        floating = false;
+        sequenceDone = true;
+        finish();
+      }
+
       // ---- The loop. One clock drives everything, so a hidden tab simply pauses the show. ----
       let last = 0;
       function tick(now) {
@@ -545,6 +591,7 @@
         todo.sort((a, b) => a.t - b.t);
         while (todo.length && todo[0].t <= clock) todo.shift().fn();
         updateSlips();
+        updateFloaters();
         updatePhys(dt);
         drawFx(dt);
         requestAnimationFrame(tick);
