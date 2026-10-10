@@ -132,7 +132,13 @@
 
   function viewError(e) {
     if (e && e.status === 0) {
-      message("Can't reach the server", e.message, '<button class="btn" data-act="retry">Try again</button>');
+      const currentApi = (window.LONGHAND && window.LONGHAND.apiBase) || '';
+      message(
+        "Can't reach the backend API",
+        `${e.message}\n\nCurrent API Endpoint: ${currentApi}`,
+        `<button class="btn" data-act="retry">Try again</button>
+         <button class="btn btn-ghost" data-act="change-api">Change API URL</button>`
+      );
     } else if (e && e.status === 403) {
       message("You can't do that", e.message, '<a class="btn btn-ghost" href="#/">Back to posts</a>');
     } else {
@@ -675,6 +681,14 @@
   /* ------------------------------------------------------------------ actions */
   const ACTS = {
     retry: () => route(),
+    'change-api'() {
+      const current = (window.LONGHAND && window.LONGHAND.apiBase) || '';
+      const entered = window.prompt("Enter your deployed Backend API URL (e.g. https://your-backend.up.railway.app/api/v1):", current);
+      if (entered && entered.trim()) {
+        try { localStorage.setItem('longhand.apiBase', entered.trim()); } catch (_) {}
+        window.location.reload();
+      }
+    },
     more: (t) => ctx.more && ctx.more(),
     signout() {
       API.token.set(null);
