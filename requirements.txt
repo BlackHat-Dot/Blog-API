@@ -9,4 +9,5 @@ python-dotenv>=1.0
 psycopg[binary]>=3.2
 pydantic-settings
 pydantic[email]
+google-genai>=2.0.0
 
