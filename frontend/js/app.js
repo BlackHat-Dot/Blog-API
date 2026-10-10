@@ -743,6 +743,11 @@
         aiStatus.textContent = 'Please depict your topic or idea first.';
         return;
       }
+      if (topic.length < 3) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be at least 3 characters.';
+        return;
+      }
       if (topic.length > 500) {
         aiStatus.hidden = false;
         aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
@@ -800,6 +805,11 @@
       const topic = aiTopicIn.value.trim();
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
+      if (topic.length < 3) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be at least 3 characters.';
+        return;
+      }
       if (topic.length > 500) {
         aiStatus.hidden = false;
         aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
