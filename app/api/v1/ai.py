@@ -198,56 +198,59 @@ def _generate_post_fallback(prompt: str, tone: str, existing_categories: list[st
     """Substantive structured fallback generator used during automated test suites."""
     clean_prompt = prompt.strip().rstrip(".")
     title_words = [w.capitalize() for w in clean_prompt.split()]
-    title = f"{' '.join(title_words[:6])}: Deep Dive & Architectural Trade-Offs"
+    title = f"{' '.join(title_words[:6])}: In-Depth Exploration & Principles"
     if len(title) < 15:
-        title = f"Mastering {clean_prompt.capitalize()}: A Deep Technical Guide"
+        title = f"Exploring {clean_prompt.capitalize()}: A Deep Dive"
 
     summary = (
-        f"A comprehensive, technical breakdown of {clean_prompt.lower()}, "
-        f"examining internal architecture, performance considerations, and production trade-offs in a {tone.lower()} tone."
+        f"A thorough, insightful examination of {clean_prompt.lower()}, "
+        f"exploring core principles, practical nuances, and deeper context written in a {tone.lower()} tone."
     )
 
-    category = "Technology"
+    category = "General"
+    t_lower = f"{prompt} {tone}".lower()
+    if any(k in t_lower for k in ["code", "software", "dev", "tech", "sql", "postgres", "api", "python", "backend"]):
+        category = "Technology"
+    elif any(k in t_lower for k in ["startup", "business", "market", "finance", "money"]):
+        category = "Business"
+    elif any(k in t_lower for k in ["food", "cook", "recipe", "culinary"]):
+        category = "Culinary"
+    elif any(k in t_lower for k in ["art", "design", "creative", "fiction", "story", "book", "writing"]):
+        category = "Creative"
+    elif any(k in t_lower for k in ["life", "mind", "philosophy", "history", "health"]):
+        category = "Culture & Philosophy"
+
     if existing_categories:
         for cat in existing_categories:
-            if cat.lower() in prompt.lower() or cat.lower() in tone.lower():
+            if cat.lower() in t_lower:
                 category = cat
                 break
         else:
             category = existing_categories[0]
 
-    # Generate substantive markdown body
-    body = f"""## 1. Architectural Foundations of {clean_prompt}
+    is_tech = category == "Technology" or any(k in t_lower for k in ["tech", "sql", "postgres", "code", "dev", "api", "database"])
+
+    if is_tech:
+        body = f"""## 1. Architectural Foundations of {clean_prompt}
 
 When evaluating **{clean_prompt}** through a **{tone}** lens, superficial assumptions quickly dissolve in the face of production realities. True architectural resilience depends on understanding what happens beneath the abstraction layer.
 
 Key design considerations include:
 - **Concurrency & State Management**: How transactions, memory boundaries, and execution threads interact under peak load.
-- **Data Integrity & Durability**: The guarantees provided by write-ahead logging (WAL), consensus protocols, and persistence mechanisms.
-- **Operational Latency**: Eliminating hidden bottlenecks such as query re-planning, network round-trips, and unindexed full table scans.
+- **Data Integrity & Durability**: The guarantees provided by persistence mechanisms, state transitions, and boundary enforcement.
+- **Operational Latency**: Eliminating hidden bottlenecks, redundant handshakes, and unindexed lookups.
 
 > "Simplicity is prerequisite for reliability. Complex architectures that cannot be reasoned about under stress are operational liabilities."
 
 ---
 
-## 2. Technical Implementation & Best Practices
+## 2. Implementation Mechanics & Best Practices
 
 To extract peak performance and maintain long-term reliability with {clean_prompt}, enforce the following battle-tested patterns:
 
-1. **Connection Pooling & Lifecycle Management**: Never allow unconstrained client connections to saturate thread or memory limits. Use dedicated pooling tiers to smooth spikes.
-2. **Deterministic Indexing**: Target high-cardinality predicate filters and composite lookup paths. Verify query execution plans via `EXPLAIN (ANALYZE, BUFFERS)`.
-3. **Automated Health & Telemetry**: Track transaction wrap-around risks, connection queue depths, and disk write latencies with alert thresholds before degradation occurs.
-
-```sql
--- Diagnostic query example for verifying resource health
-SELECT
-    datname,
-    numbackends AS active_connections,
-    xact_commit AS committed_tx,
-    xact_rollback AS rolled_back_tx
-FROM pg_stat_database
-WHERE datname = current_database();
-```
+1. **Lifecycle Management**: Never allow unconstrained client connections to saturate thread or memory limits. Smooth resource consumption with proactive boundaries.
+2. **Deterministic Querying & Access**: Target high-cardinality filters and verify execution paths to avoid wasteful overhead.
+3. **Automated Telemetry**: Track health metrics, queue depths, and latencies with alert thresholds before degradation occurs.
 
 ---
 
@@ -258,6 +261,38 @@ Every architectural decision represents a deliberate trade-off between throughpu
 - **Measure Before Optimizing**: Synthetic benchmarks rarely replicate real-world cache hit ratios and concurrency hot-spots.
 - **Fail Gracefully**: Implement exponential back-off and circuit breakers on transient infrastructure hiccups.
 - **Document Decisions**: Capture the reasoning behind schema constraints and tuning parameters so future maintainers understand the context.
+"""
+    else:
+        body = f"""## 1. Exploring the Essence of {clean_prompt}
+
+Approaching **{clean_prompt}** through a **{tone}** perspective invites us to step past surface-level assumptions and engage directly with its living nuances. 
+
+Whether examining human experience, creative expression, or strategic ideas, the most compelling insights emerge when we look closely at the foundational tensions at play:
+- **Depth Over Superficiality**: Moving past clichés to unpack the genuine motivations and textures of the topic.
+- **Contextual Understanding**: Recognizing that universal rules often falter when separated from their human or environmental setting.
+- **Evolution and Perspective**: Seeing how ideas adapt, reshape, and resonate across different contexts.
+
+> "Clarity arrives not from ignoring nuance, but from learning how to perceive it clearly."
+
+---
+
+## 2. Core Themes & Perspectives
+
+To truly engage with {clean_prompt}, we must consider several key dimensions:
+
+1. **The Human Element**: How individuals and communities interact with, shape, and are shaped by these dynamics.
+2. **The Friction of Change**: Why conventional wisdom often resists evolution, and what happens when fresh perspectives break through.
+3. **Intentional Practice**: Cultivating a mindful, deliberate approach rather than falling back on reflexive habits.
+
+---
+
+## 3. Reflections and Looking Forward
+
+As we reflect on {clean_prompt}, the most enduring takeaway is that sustained attention brings lasting understanding:
+
+- **Question Assumptions**: Interrogate legacy perspectives before adopting them wholesale.
+- **Embrace Curiosity**: Treat friction and ambiguity as invitations to learn rather than obstacles to avoid.
+- **Articulate the Vision**: Share your insights openly, creating common ground that helps others see the topic with renewed clarity.
 """
 
     tags = [re.sub(r"[^a-z0-9]", "", w.lower()) for w in clean_prompt.split() if len(w) > 3][:4]
@@ -320,21 +355,26 @@ def generate_post(
     if provider == "gemini":
         try:
             categories_str = ", ".join(request.existing_categories) if request.existing_categories else "None"
-            system_instruction = f"""You are an elite technical author, essayist, and senior editor for Longhand.
-Your mandate is to produce an exceptional, comprehensive, publication-ready post based on the user's depiction and selected tone.
+            system_instruction = f"""You are a versatile, world-class author, essayist, and editorial writer for Longhand.
+Your mandate is to craft an exceptional, comprehensive, publication-ready post shaped entirely by the user's topic and selected tone.
 
-STRICT EDITORIAL & TECHNICAL QUALITY STANDARDS:
-1. SUBSTANTIVE & TOPIC-SPECIFIC: Dive directly into concrete substance, architecture, real-world mechanics, trade-offs, and examples for '{request.prompt}'. Do NOT write vague generic filler or high-level platitudes.
-2. IMPECCABLE GRAMMAR & STYLE: Zero grammatical errors, typos, or awkward prose. Write with compelling pacing and crisp vocabulary.
-3. AUTHENTIC VOICE & TONE: Embody the requested tone: '{request.tone}'.
+EDITORIAL STANDARDS & DOMAIN ADAPTATION:
+1. DOMAIN AGNOSTIC & AUTHENTIC: Adapt organically to the user's topic domain:
+   - If the topic is technical/engineering: delve into architectural foundations, mechanics, tradeoffs, and code/configuration examples where applicable.
+   - If the topic is literature, storytelling, philosophy, or personal reflection: craft evocative prose, rich narrative structure, deep human insights, and thoughtful questions.
+   - If the topic is business, entrepreneurship, or economics: explore market dynamics, strategic positioning, unit economics, execution frameworks, and practical lessons.
+   - If the topic is culinary, travel, art, or culture: engage sensory details, historical context, craft, and vivid appreciation.
+   - For ANY topic: do NOT force unnatural technical jargon or code if the subject matter does not warrant it. Meet the reader where the topic naturally lives.
+2. SUBSTANTIVE & TOPIC-SPECIFIC: Dive directly into concrete substance and real-world nuance for '{request.prompt}'. Do NOT rely on hollow filler or empty generalities.
+3. AUTHENTIC VOICE & TONE: Fully embody the requested tone: '{request.tone}'.
 4. STRUCTURED MARKDOWN:
-   - Rich section headings (## and ###).
-   - In-depth technical explanations with code snippets / SQL examples / configuration blocks where appropriate.
-   - Bulleted insights, architectural trade-offs, and callout blockquotes (> quote).
+   - Clear, engaging section headings (## and ###).
+   - Paragraphs with natural cadence, bulleted takeaways where helpful, and blockquotes (> quote) for focal points.
+   - Include code snippets, lists, or tables ONLY when the subject matter naturally calls for them.
 5. STRICT FIELD LENGTH LIMITS (MANDATORY):
    - Title: Engaging headline (5 to 255 characters).
    - Summary: Standfirst hooking the reader (10 to 1,000 characters).
-   - Category: Choose from [{categories_str}] or suggest a fitting name (1 to 50 characters).
+   - Category: Choose from [{categories_str}] or suggest a fitting name matching the domain (1 to 50 characters).
    - Tags: 3 to 6 lowercase tags, each 1 to 30 characters maximum (max 15 tags total).
    - Body: In-depth markdown article (50 to 100,000 characters).
 """
