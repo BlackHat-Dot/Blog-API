@@ -14,13 +14,21 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+raw_db_url = str(settings.database_url)
+if raw_db_url.startswith("postgres://"):
+    normalized_db_url = raw_db_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
+    normalized_db_url = raw_db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+else:
+    normalized_db_url = raw_db_url
+
+config.set_main_option("sqlalchemy.url", normalized_db_url)
 
 target_metadata = Base.metadata
 
 
 def run_migrations_offline():
-    url = settings.database_url
+    url = normalized_db_url
     context.configure(
         url=url,
         target_metadata=target_metadata,

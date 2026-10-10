@@ -62,8 +62,7 @@ def create_post(session: Session, author_id: int, post_data: PostCreate) -> Post
     post.tags = get_or_create_tags(session, post_data.tags)
     session.add(post)
     session.commit()
-    session.refresh(post)
-    return post
+    return get_post(session, post.id)
 
 
 def update_post(session: Session, post: Post, post_data: PostUpdate) -> Post:
@@ -84,16 +83,41 @@ def update_post(session: Session, post: Post, post_data: PostUpdate) -> Post:
         post.tags = get_or_create_tags(session, post_data.tags)
     session.add(post)
     session.commit()
-    session.refresh(post)
-    return post
+    return get_post(session, post.id)
 
+
+from sqlalchemy.orm import selectinload
 
 def get_post(session: Session, post_id: int) -> Post | None:
-    return session.get(Post, post_id)
+    statement = (
+        select(Post)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.category),
+            selectinload(Post.tags),
+            selectinload(Post.likes),
+            selectinload(Post.bookmarks),
+            selectinload(Post.comments),
+        )
+        .where(Post.id == post_id)
+    )
+    return session.scalar(statement)
 
 
 def get_post_by_slug(session: Session, slug: str) -> Post | None:
-    return session.scalar(select(Post).where(Post.slug == slug))
+    statement = (
+        select(Post)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.category),
+            selectinload(Post.tags),
+            selectinload(Post.likes),
+            selectinload(Post.bookmarks),
+            selectinload(Post.comments),
+        )
+        .where(Post.slug == slug)
+    )
+    return session.scalar(statement)
 
 
 def list_posts(
@@ -106,46 +130,65 @@ def list_posts(
     limit: int = 20,
     offset: int = 0,
 ):
-    statement = select(Post).order_by(Post.created_at.desc())
+    statement = (
+        select(Post)
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.category),
+            selectinload(Post.tags),
+            selectinload(Post.likes),
+            selectinload(Post.bookmarks),
+            selectinload(Post.comments),
+        )
+        .order_by(Post.created_at.desc())
+    )
+    count_query = select(func.count(func.distinct(Post.id))).select_from(Post)
+
     if search:
-        statement = statement.where(
+        search_filter = (
             Post.title.ilike(f"%{search}%")
             | Post.summary.ilike(f"%{search}%")
             | Post.body.ilike(f"%{search}%")
         )
+        statement = statement.where(search_filter)
+        count_query = count_query.where(search_filter)
+
     if state:
         statement = statement.where(Post.state == state)
+        count_query = count_query.where(Post.state == state)
+
     if category:
         statement = statement.join(Post.category).where(Category.slug == category)
+        count_query = count_query.join(Post.category).where(Category.slug == category)
+
     if tag:
         statement = statement.join(Post.tags).where(Tag.slug == tag)
+        count_query = count_query.join(Post.tags).where(Tag.slug == tag)
+
     if author:
         statement = statement.join(Post.author).where(User.username == author)
+        count_query = count_query.join(Post.author).where(User.username == author)
+
     if category or tag or author:
         statement = statement.distinct()
-    count_query = select(func.count()).select_from(Post)
-    if search:
-        count_query = count_query.where(
-            Post.title.ilike(f"%{search}%")
-            | Post.summary.ilike(f"%{search}%")
-            | Post.body.ilike(f"%{search}%")
-        )
-    if state:
-        count_query = count_query.where(Post.state == state)
-    if category:
-        count_query = count_query.join(Post.category).where(Category.slug == category)
-    if tag:
-        count_query = count_query.join(Post.tags).where(Tag.slug == tag)
-    if author:
-        count_query = count_query.join(Post.author).where(User.username == author)
-    total = session.scalar(count_query)
+
+    total = session.scalar(count_query) or 0
     posts = session.scalars(statement.limit(limit).offset(offset)).all()
     return posts, total
 
 
 def get_popular_posts(session: Session, limit: int = 10, offset: int = 0):
+    total = session.scalar(select(func.count(Post.id)).where(Post.state == "published")) or 0
     statement = (
         select(Post, func.count(Like.id).label("like_count"))
+        .options(
+            selectinload(Post.author),
+            selectinload(Post.category),
+            selectinload(Post.tags),
+            selectinload(Post.likes),
+            selectinload(Post.bookmarks),
+            selectinload(Post.comments),
+        )
         .outerjoin(Like, Like.post_id == Post.id)
         .where(Post.state == "published")
         .group_by(Post.id)
@@ -153,4 +196,5 @@ def get_popular_posts(session: Session, limit: int = 10, offset: int = 0):
         .limit(limit)
         .offset(offset)
     )
-    return session.execute(statement).all()
+    rows = session.execute(statement).all()
+    return rows, total

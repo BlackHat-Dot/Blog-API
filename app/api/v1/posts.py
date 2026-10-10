@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
+from app.core.utils import slugify
 from app.crud.interaction import (
     bookmark_post,
     like_post,
@@ -29,7 +30,7 @@ def _build_post_response(post, like_count: int | None = None, bookmark_count: in
         word_count=post.word_count,
         read_time=post.read_time,
         author={"username": post.author.username, "bio": post.author.bio},
-        category=CategoryRead.from_orm(post.category) if post.category else None,
+        category=CategoryRead.model_validate(post.category) if post.category else None,
         tags=[tag.name for tag in post.tags],
         like_count=like_count if like_count is not None else len(post.likes),
         bookmark_count=bookmark_count if bookmark_count is not None else len(post.bookmarks),
@@ -65,9 +66,9 @@ def read_popular_posts(
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
 ):
-    rows = get_popular_posts(session, limit, offset)
+    rows, total = get_popular_posts(session, limit, offset)
     items = [_build_post_response(post, like_count=like_count) for post, like_count in rows]
-    return {"total": len(items), "limit": limit, "offset": offset, "items": items}
+    return {"total": total, "limit": limit, "offset": offset, "items": items}
 
 
 @router.get("/posts/{post_id}", response_model=PostResponse)
@@ -154,10 +155,14 @@ def list_categories(session: Session = Depends(get_session)):
 
 @router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
 def create_category(category_input: CategoryCreate, current_user=Depends(get_current_user), session: Session = Depends(get_session)):
-    existing = session.scalar(select(Category).where(Category.name == category_input.name))
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category already exists")
-    category = Category(name=category_input.name, slug=category_input.slug)
+    slug = category_input.slug or slugify(category_input.name)
+    existing_name = session.scalar(select(Category).where(Category.name == category_input.name))
+    if existing_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category name already exists")
+    existing_slug = session.scalar(select(Category).where(Category.slug == slug))
+    if existing_slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug already exists")
+    category = Category(name=category_input.name, slug=slug)
     session.add(category)
     session.commit()
     session.refresh(category)

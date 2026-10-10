@@ -5,6 +5,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class CommentCreate(BaseModel):
     body: str = Field(..., min_length=1)
+    parent_id: int | None = None
+
+
+class CommentAuthor(BaseModel):
+    id: int
+    username: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommentRead(BaseModel):
@@ -14,5 +22,6 @@ class CommentRead(BaseModel):
     post_id: int
     parent_id: int | None = None
     created_at: datetime
+    author: CommentAuthor | None = None
 
     model_config = ConfigDict(from_attributes=True)

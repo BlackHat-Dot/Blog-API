@@ -19,7 +19,10 @@ def post_comment(
 ):
     if not get_post(session, post_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    return create_comment(session, post_id, current_user.id, comment_input)
+    try:
+        return create_comment(session, post_id, current_user.id, comment_input)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/posts/{post_id}/comments", response_model=list[CommentRead])
