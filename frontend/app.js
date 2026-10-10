@@ -11,6 +11,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const main = $('#main');
 
+  try { localStorage.removeItem('longhand.gemini_key'); } catch {}
+
   /* ------------------------------------------------------------------ helpers */
   const S = { me: null, cats: null, tags: null, likes: new Set(), marks: new Set() };
   let nav = 0;
@@ -194,19 +196,49 @@
 
   const skeleton = (n = 3) => `<div class="skel" aria-hidden="true">${'<div class="s-t"></div><div class="s-l"></div><div class="s-m"></div><div style="height:28px"></div>'.repeat(n)}</div>`;
 
+  function getPageNumbers(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages = [];
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...');
+      pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(current - 1);
+      pages.push(current);
+      pages.push(current + 1);
+      pages.push('...');
+      pages.push(total);
+    }
+    return pages;
+  }
+
   /* ------------------------------------------------------------------ home */
   async function viewHome(q, id) {
     const sort = q.get('sort') === 'popular' ? 'popular' : 'latest';
     const f = { search: q.get('q') || '', category: q.get('category') || '', tag: q.get('tag') || '' };
     const filtered = !!(f.search || f.category || f.tag);
     const popular = sort === 'popular' && !filtered;
-    document.title = APP;
+    const pageNum = Math.max(1, parseInt(q.get('page') || '1', 10) || 1);
+    const LIMIT = 10;
+    const offset = (pageNum - 1) * LIMIT;
+
+    document.title = pageNum > 1 ? `${APP} – Page ${pageNum}` : APP;
     main.innerHTML = `<div class="home"><div></div><div>${skeleton()}</div></div>`;
 
-    const LIMIT = 12;
-    const load = (offset) => (popular ? API.popular({ limit: LIMIT, offset }) : API.posts({ search: f.search, category: f.category, tag: f.tag, limit: LIMIT, offset }));
-    const [cats, tags, page] = await Promise.all([getCats(), getTags(), load(0)]);
+    const load = (off) => (popular ? API.popular({ limit: LIMIT, offset: off }) : API.posts({ search: f.search, category: f.category, tag: f.tag, limit: LIMIT, offset: off }));
+    const [cats, tags, page] = await Promise.all([getCats(), getTags(), load(offset)]);
     if (id !== nav) return;
+
+    const totalPages = Math.ceil(page.total / LIMIT);
 
     const catName = f.category ? (cats.find((c) => c.slug === f.category) || {}).name || f.category : '';
     const tagName = f.tag ? tags.find((t) => slugify(t) === f.tag) || f.tag : '';
@@ -215,9 +247,46 @@
     else if (catName) title = catName;
     else if (tagName) title = `Tagged ${tagName}`;
 
+    if (title) {
+      document.title = pageNum > 1 ? `${title} – Page ${pageNum} – ${APP}` : `${title} – ${APP}`;
+    }
+
     const catLinks = [`<li><a href="#/" ${!filtered && !popular ? 'aria-current="true"' : ''}>All posts</a></li>`]
       .concat(cats.map((c) => `<li><a href="#/?category=${encodeURIComponent(c.slug)}" ${f.category === c.slug ? 'aria-current="true"' : ''}>${esc(c.name)}</a></li>`)).join('');
     const tagLinks = tags.slice(0, 20).map((t) => `<a href="#/?tag=${encodeURIComponent(slugify(t))}" ${f.tag === slugify(t) ? 'aria-current="true"' : ''}>${esc(t)}</a>`).join('');
+
+    const pageHref = (p) => {
+      const params = new URLSearchParams();
+      if (sort === 'popular') params.set('sort', 'popular');
+      if (f.search) params.set('q', f.search);
+      if (f.category) params.set('category', f.category);
+      if (f.tag) params.set('tag', f.tag);
+      if (p > 1) params.set('page', String(p));
+      const qs = params.toString();
+      return qs ? `#/?${qs}` : '#/';
+    };
+
+    const renderPagination = () => {
+      if (totalPages <= 1) return '';
+      const nums = getPageNumbers(pageNum, totalPages);
+      const prevBtn = pageNum > 1
+        ? `<a class="page-btn page-prev" href="${pageHref(pageNum - 1)}" rel="prev">← Previous</a>`
+        : `<span class="page-btn page-prev disabled" aria-disabled="true">← Previous</span>`;
+      const nextBtn = pageNum < totalPages
+        ? `<a class="page-btn page-next" href="${pageHref(pageNum + 1)}" rel="next">Next →</a>`
+        : `<span class="page-btn page-next disabled" aria-disabled="true">Next →</span>`;
+      const numLinks = nums.map((n) => {
+        if (n === '...') return `<span class="page-gap" aria-hidden="true">…</span>`;
+        if (n === pageNum) return `<a class="page-num active" href="${pageHref(n)}" aria-current="page">${n}</a>`;
+        return `<a class="page-num" href="${pageHref(n)}">${n}</a>`;
+      }).join('');
+
+      return `<nav class="pagination" aria-label="Pagination">
+        ${prevBtn}
+        <div class="page-numbers">${numLinks}</div>
+        ${nextBtn}
+      </nav>`;
+    };
 
     main.innerHTML = `<div class="home">
       <aside class="rail" aria-label="Browse">
@@ -230,21 +299,31 @@
       </aside>
       <section aria-label="Posts">
         ${title
-          ? `<header class="feed-head"><h1>${esc(title)}</h1><p>${plural(page.total, 'post')} <a href="#/">Clear</a></p></header>`
+          ? `<header class="feed-head"><h1>${esc(title)}</h1><p>${plural(page.total, 'post')} ${totalPages > 1 ? `· Page ${pageNum} of ${totalPages}` : ''} <a href="#/">Clear</a></p></header>`
           : `<h1 class="sr">${popular ? 'Most liked posts' : 'Latest posts'}</h1>
              <nav class="sortbar" aria-label="Order"><a href="#/" ${!popular ? 'aria-current="true"' : ''}>Latest</a><a href="#/?sort=popular" ${popular ? 'aria-current="true"' : ''}>Most liked</a></nav>`}
         <div id="feed-list"></div>
-        <button class="btn btn-ghost more" data-act="more" hidden>Show more posts</button>
+        ${renderPagination()}
       </section></div>`;
 
     const list = $('#feed-list');
     if (!page.items.length) {
-      list.innerHTML = filtered
-        ? `<div class="empty"><h2>Nothing matches</h2><p>Try fewer words, or browse all posts.</p><a class="btn btn-ghost" href="#/">Show all posts</a></div>`
-        : `<div class="empty"><h2>No posts yet</h2><p>Be the first to publish something here.</p>${S.me ? '<a class="btn" href="#/write">Write a post</a>' : '<a class="btn" href="#/register">Create an account</a>'}</div>`;
+      if (pageNum > 1 && page.total > 0) {
+        list.innerHTML = `<div class="empty"><h2>Page empty</h2><p>There are no posts on page ${pageNum}.</p><a class="btn btn-ghost" href="${pageHref(1)}">Back to first page</a></div>`;
+      } else {
+        list.innerHTML = filtered
+          ? `<div class="empty"><h2>Nothing matches</h2><p>Try fewer words, or browse all posts.</p><a class="btn btn-ghost" href="#/">Show all posts</a></div>`
+          : `<div class="empty"><h2>No posts yet</h2><p>Be the first to publish something here.</p>${S.me ? '<a class="btn" href="#/write">Write a post</a>' : '<a class="btn" href="#/register">Create an account</a>'}</div>`;
+      }
       return;
     }
-    mountList({ list, more: $('.more'), first: page, load, lead: !f.search });
+    const isFirstPage = pageNum === 1;
+    list.innerHTML = page.items.map((p, k) => entry(p, {
+      lead: !f.search && isFirstPage && k === 0,
+      i: offset + k,
+      byline: true
+    })).join('');
+    list.classList.add('anim');
   }
 
   /* ------------------------------------------------------------------ post */
@@ -557,20 +636,42 @@
         <div class="ai-panel" id="ai-panel">
           <div class="ai-head-row" id="ai-head-toggle">
             <div class="ai-title-wrap">
-              <span class="ai-badge">✨ AI</span>
+              <span class="ai-badge" id="ai-header-badge">
+                <svg class="gemini-icon" id="ai-header-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="currentColor"/>
+                </svg>
+                <span>AI</span>
+              </span>
               <div>
                 <span class="ai-title">Write with AI</span>
                 <span class="ai-desc">— Depict your idea and choose a dynamic tone</span>
               </div>
             </div>
-            <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            <div class="ai-head-right">
+              <div class="ai-model-pill" id="ai-header-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-header-model-name">gemini-2.5-flash</span>
+              </div>
+              <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
+            </div>
           </div>
           <div class="ai-body" id="ai-body" hidden>
             <div class="ai-input-group">
-              <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why SQLite in production is a great idea)..." autocomplete="off">
+              <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." maxlength="500" autocomplete="off">
               <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
             </div>
-            <p class="ai-status" id="ai-status" hidden></p>
+            <div class="ai-status-row" id="ai-status-row" hidden>
+              <div class="ai-status" id="ai-status">
+                <svg class="gemini-icon spinning" id="ai-status-gemini" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" fill="var(--accent)"/>
+                </svg>
+                <span id="ai-status-text">Thinking...</span>
+              </div>
+              <div class="ai-model-pill" id="ai-model-pill" hidden>
+                <span class="dot"></span>
+                <span id="ai-model-name">gemini-2.5-flash</span>
+              </div>
+            </div>
             <div class="ai-tones-section" id="ai-tones-section" hidden>
               <div class="ai-tones-header">
                 <span>Suggested tones for this depiction:</span>
@@ -578,23 +679,23 @@
               </div>
               <div class="ai-tones-grid" id="ai-tones-grid"></div>
               <div class="ai-custom-row">
-                <input type="text" class="ai-input" id="ai-custom-tone-in" placeholder="Or specify your custom tone...">
+                <input type="text" class="ai-input" id="ai-custom-tone-in" placeholder="Or specify your custom tone..." maxlength="100">
                 <button type="button" class="btn" id="ai-write-btn" disabled>Write Post</button>
               </div>
             </div>
           </div>
         </div>
         <label class="sr" for="ed-title">Title</label>
-        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="255" autocomplete="off">
+        <input class="ed-title" id="ed-title" name="title" type="text" placeholder="Title" maxlength="55" autocomplete="off">
         <label class="sr" for="ed-sum">Summary</label>
-        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" placeholder="A sentence or two that sets up the post (optional)"></textarea>
+        <textarea class="ed-sum" id="ed-sum" name="summary" rows="1" maxlength="110" placeholder="A sentence or two that sets up the post (optional)"></textarea>
         <div class="ed-tabs" role="tablist" aria-label="Editor mode">
           <button type="button" role="tab" id="tab-write" aria-selected="true" aria-controls="ed-body" data-tab="write">Write</button>
           <button type="button" role="tab" id="tab-preview" aria-selected="false" aria-controls="ed-preview" data-tab="preview">Preview</button>
           <span class="hint">Markdown: # heading, **bold**, *italic*, &gt; quote, - list, \`code\`</span>
         </div>
         <label class="sr" for="ed-body">Body</label>
-        <textarea class="ed-body" id="ed-body" name="body" placeholder="Start writing…"></textarea>
+        <textarea class="ed-body" id="ed-body" name="body" maxlength="100000" placeholder="Start writing…"></textarea>
         <div class="prose" id="ed-preview" hidden></div>
       </div>
       <aside class="ed-side" aria-label="Post settings">
@@ -608,11 +709,11 @@
             ${cats.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
             <option value="__new__">New category…</option>
           </select>
-          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="100" hidden style="margin-top:8px" aria-label="New category name">
+          <input id="ed-newcat" type="text" placeholder="Category name" maxlength="15" hidden style="margin-top:8px" aria-label="New category name">
         </div>
         <div class="field"><label for="ed-tags">Tags</label>
           <div class="chips" id="chips"></div>
-          <input id="ed-tags" type="text" list="tag-list" placeholder="Add a tag, then press Enter" autocomplete="off">
+          <input id="ed-tags" type="text" list="tag-list" maxlength="15" placeholder="Add a tag, then press Enter" autocomplete="off">
           <datalist id="tag-list">${tagNames.map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
         </div>
         <p class="stats" id="ed-stats"></p>
@@ -657,7 +758,10 @@
     };
     const addTag = (raw) => {
       const t = raw.trim().toLowerCase().replace(/,+$/, '').trim();
-      if (t && !E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
+      if (!t) return;
+      if (t.length > 15) { toast('Each tag must be 15 characters or less.'); return; }
+      if (E.tags.length >= 15) { toast('A post can have at most 15 tags.'); return; }
+      if (!E.tags.includes(t)) { E.tags.push(t); drawChips(); persist(); }
       tagIn.value = '';
     };
 
@@ -668,7 +772,15 @@
     const aiBody = $('#ai-body', f);
     const aiTopicIn = $('#ai-topic-in', f);
     const aiTonesBtn = $('#ai-tones-btn', f);
+    const aiStatusRow = $('#ai-status-row', f);
     const aiStatus = $('#ai-status', f);
+    const aiStatusGemini = $('#ai-status-gemini', f);
+    const aiStatusText = $('#ai-status-text', f);
+    const aiModelPill = $('#ai-model-pill', f);
+    const aiModelName = $('#ai-model-name', f);
+    const aiHeaderModelPill = $('#ai-header-model-pill', f);
+    const aiHeaderModelName = $('#ai-header-model-name', f);
+    const aiHeaderGemini = $('#ai-header-gemini', f);
     const aiTonesSection = $('#ai-tones-section', f);
     const aiTonesGrid = $('#ai-tones-grid', f);
     const aiCustomToneIn = $('#ai-custom-tone-in', f);
@@ -676,9 +788,94 @@
 
     let selectedTone = '';
 
-    const toggleAiPanel = () => {
-      const isHidden = aiBody.hidden;
-      aiBody.hidden = !isHidden;
+    const updateModelPills = (modelUsed) => {
+      if (!modelUsed) return;
+      const isFallback = modelUsed.toLowerCase().includes('fallback') || modelUsed.toLowerCase().includes('mock');
+      
+      // Update inline status row pill
+      aiModelName.textContent = modelUsed;
+      aiModelPill.hidden = false;
+      aiModelPill.classList.toggle('fallback', isFallback);
+
+      // Update header pill so it remains visible even when collapsed
+      if (aiHeaderModelPill && aiHeaderModelName) {
+        aiHeaderModelName.textContent = modelUsed;
+        aiHeaderModelPill.hidden = false;
+        aiHeaderModelPill.classList.toggle('fallback', isFallback);
+      }
+    };
+
+    const showAiLoading = (message) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.hidden = false;
+      aiStatusGemini.classList.add('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.add('spinning');
+      aiStatusText.textContent = message;
+    };
+
+    const showAiSuccess = (message, modelUsed) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = false;
+      aiStatusText.textContent = message;
+      if (modelUsed) {
+        updateModelPills(modelUsed);
+      }
+    };
+
+    const showAiError = (errMessage) => {
+      aiStatusRow.hidden = false;
+      aiStatusGemini.classList.remove('spinning');
+      if (aiHeaderGemini) aiHeaderGemini.classList.remove('spinning');
+      aiStatusGemini.hidden = true;
+      aiStatusText.textContent = errMessage;
+    };
+
+    const clearEditorFields = () => {
+      title.value = '';
+      E.title = '';
+      sum.value = '';
+      E.summary = '';
+      body.value = '';
+      E.body = '';
+      E.tags = [];
+      drawChips();
+      cat.value = '';
+      E.category_id = '';
+      newcat.value = '';
+      newcat.hidden = true;
+      autosize(sum);
+      autosize(body);
+      stats();
+      persist();
+    };
+
+    const hasExistingContent = () => {
+      return !!(title.value.trim() || sum.value.trim() || body.value.trim() || E.tags.length > 0);
+    };
+
+    const confirmAiOverwrite = async () => {
+      if (!hasExistingContent()) return true;
+      return await confirmDialog({
+        title: 'Overwrite existing post?',
+        body: 'You already have content in your post. Would you like to clear and replace it with this AI generation?',
+        confirm: 'Yes, overwrite post',
+      });
+    };
+
+    const toggleAiPanel = async () => {
+      const willOpen = aiBody.hidden;
+      if (willOpen && hasExistingContent()) {
+        const ok = await confirmDialog({
+          title: 'Start fresh with AI?',
+          body: 'You have existing content in your post. Do you want to clear your current draft to write a fresh post with AI?',
+          confirm: 'Clear & Start AI',
+        });
+        if (!ok) return;
+        clearEditorFields();
+      }
+      aiBody.hidden = !willOpen;
       aiPanel.classList.toggle('open', !aiBody.hidden);
       aiExpandBtn.textContent = aiBody.hidden ? 'Expand' : 'Collapse';
       if (!aiBody.hidden) aiTopicIn.focus();
@@ -697,9 +894,18 @@
         aiStatus.textContent = 'Please depict your topic or idea first.';
         return;
       }
+      if (topic.length < 3) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be at least 3 characters.';
+        return;
+      }
+      if (topic.length > 500) {
+        aiStatus.hidden = false;
+        aiStatus.textContent = 'Topic depiction must be 500 characters or less.';
+        return;
+      }
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = '✨ Analyzing your depiction and discovering tailored tones...';
+      showAiLoading('Analyzing your depiction and discovering tailored tones...');
       aiTonesSection.hidden = true;
       try {
         const res = await API.suggestTones(topic);
@@ -735,10 +941,10 @@
           aiWriteBtn.textContent = selectedTone ? `Write in "${selectedTone.slice(0, 18)}..."` : 'Pick a tone';
         };
 
-        aiStatus.hidden = true;
+        showAiSuccess('Tones discovered successfully', res.model_used);
         aiTonesSection.hidden = false;
       } catch (err) {
-        aiStatus.textContent = `Could not analyze tones: ${err.message}`;
+        showAiError(`Could not analyze tones: ${err.message}`);
       } finally {
         aiTonesBtn.disabled = false;
       }
@@ -749,11 +955,29 @@
       const topic = aiTopicIn.value.trim();
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
+      if (topic.length < 3) {
+        showAiError('Topic depiction must be at least 3 characters.');
+        return;
+      }
+      if (topic.length > 500) {
+        showAiError('Topic depiction must be 500 characters or less.');
+        return;
+      }
+      if (tone.length > 100) {
+        showAiError('Tone must be 100 characters or less.');
+        return;
+      }
+
+      // Check if user has existing content before generating/overwriting
+      if (hasExistingContent()) {
+        const ok = await confirmAiOverwrite();
+        if (!ok) return;
+        clearEditorFields();
+      }
 
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;
-      aiStatus.hidden = false;
-      aiStatus.textContent = `✍️ Writing post with impeccable grammar in "${tone}" tone...`;
+      showAiLoading(`Writing post with thoughtful prose in "${tone}" tone...`);
 
       try {
         const existingCatNames = cats.map((c) => c.name);
@@ -769,19 +993,51 @@
         body.value = res.body;
         E.body = res.body;
 
-        // Auto-fill tags
+        // Auto-fill tags cleanly
         if (Array.isArray(res.tags)) {
-          E.tags = Array.from(new Set([...E.tags, ...res.tags]));
+          E.tags = [...res.tags];
           drawChips();
         }
 
         // Auto-fill category
         if (res.category) {
-          const matched = cats.find((c) => c.name.toLowerCase() === res.category.toLowerCase());
+          const catName = res.category.trim();
+          let matched = cats.find((c) =>
+            c.name.toLowerCase() === catName.toLowerCase() ||
+            catName.toLowerCase().includes(c.name.toLowerCase()) ||
+            c.name.toLowerCase().includes(catName.toLowerCase())
+          );
+
           if (matched) {
             cat.value = String(matched.id);
             E.category_id = matched.id;
+            newcat.hidden = true;
+          } else {
+            try {
+              // Automatically create the suggested category via API so it exists in DB & UI
+              const newCatObj = await API.createCategory(catName);
+              cats.push(newCatObj);
+              S.cats = null;
+              const opt = document.createElement('option');
+              opt.value = String(newCatObj.id);
+              opt.textContent = newCatObj.name;
+              const newOpt = cat.querySelector('option[value="__new__"]');
+              if (newOpt) cat.insertBefore(opt, newOpt);
+              else cat.appendChild(opt);
+
+              cat.value = String(newCatObj.id);
+              E.category_id = newCatObj.id;
+              newcat.hidden = true;
+            } catch {
+              cat.value = '__new__';
+              newcat.value = catName;
+              newcat.hidden = false;
+            }
           }
+          cat.classList.add('ai-filled-glow');
+        } else if (cats.length > 0 && !cat.value) {
+          cat.value = String(cats[0].id);
+          E.category_id = cats[0].id;
         }
 
         autosize(sum);
@@ -797,16 +1053,19 @@
           title.classList.remove('ai-filled-glow');
           sum.classList.remove('ai-filled-glow');
           body.classList.remove('ai-filled-glow');
+          cat.classList.remove('ai-filled-glow');
         }, 1500);
 
-        aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
+        showAiSuccess('Post generated successfully!', res.model_used);
         toast('AI post draft generated!');
         setTimeout(() => {
-          toggleAiPanel();
+          aiBody.hidden = true;
+          aiPanel.classList.remove('open');
+          aiExpandBtn.textContent = 'Expand';
           title.focus();
         }, 1200);
       } catch (err) {
-        aiStatus.textContent = `Post generation error: ${err.message}`;
+        showAiError(`Post generation error: ${err.message}`);
       } finally {
         aiWriteBtn.disabled = false;
         aiTonesBtn.disabled = false;
@@ -857,14 +1116,21 @@
         err.textContent = '';
         addTag(tagIn.value);
         if (E.title.trim().length < 5) { err.textContent = 'Give the post a title of at least 5 characters.'; title.focus(); return; }
+        if (E.title.trim().length > 55) { err.textContent = 'Title must be 55 characters or less.'; title.focus(); return; }
+        if (E.summary && E.summary.trim().length > 110) { err.textContent = 'Description/summary must be 110 characters or less.'; sum.focus(); return; }
         if (E.body.trim().length < 20) { err.textContent = 'Write at least 20 characters in the body.'; body.focus(); return; }
+        if (E.body.length > 100000) { err.textContent = 'Body must be 100,000 characters or less.'; body.focus(); return; }
+        if (E.tags.length > 15) { err.textContent = 'A post can have at most 15 tags.'; tagIn.focus(); return; }
         let categoryId = cat.value === '__new__' ? null : cat.value ? Number(cat.value) : null;
-        if (cat.value === '__new__') {
-          const name = newcat.value.trim();
-          if (!name) { err.textContent = 'Name the new category, or pick an existing one.'; newcat.focus(); return; }
-          const c = await API.createCategory(name);
-          S.cats = null;
-          categoryId = c.id;
+        if (cat.value === '__new__' || cat.value === '') {
+          if (cat.value === '__new__') {
+            const name = newcat.value.trim();
+            if (!name) { err.textContent = 'Name the new category, or pick an existing one.'; newcat.focus(); return; }
+            if (name.length > 15) { err.textContent = 'Category name must be 15 characters or less.'; newcat.focus(); return; }
+            const c = await API.createCategory(name);
+            S.cats = null;
+            categoryId = c.id;
+          }
         }
         const payload = { title: E.title.trim(), summary: post ? E.summary.trim() : E.summary.trim() || null, body: E.body, category_id: categoryId, tags: E.tags, state: E.state };
         const saved = post ? await API.updatePost(post.id, payload) : await API.createPost(payload);

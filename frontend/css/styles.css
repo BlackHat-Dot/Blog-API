@@ -210,6 +210,90 @@ label, legend { font-weight: 500; }
 .flag { color: var(--accent); font-weight: 600; }
 .more { margin-top: 8px; }
 
+/* ---------- pagination ---------- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font: 500 14px/1.2 var(--sans);
+}
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  color: var(--ink);
+  text-decoration: none;
+  background: transparent;
+  transition: all .15s ease;
+  user-select: none;
+}
+.page-btn:hover:not(.disabled) {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+.page-btn.disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  border-color: var(--line);
+  color: var(--mute);
+}
+.page-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: all .15s ease;
+}
+.page-num:hover:not(.active) {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.page-num.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.page-gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 36px;
+  color: var(--mute);
+  user-select: none;
+}
+@media (max-width: 600px) {
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+  .page-numbers {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+}
+
 /* ---------- messages / empty ---------- */
 .msg { max-width: 560px; margin: 0 auto; padding: 96px 24px; }
 .msg h1 { font: 700 2.1rem/1.15 var(--serif); letter-spacing: -.02em; margin-bottom: 14px; }

@@ -196,19 +196,49 @@
 
   const skeleton = (n = 3) => `<div class="skel" aria-hidden="true">${'<div class="s-t"></div><div class="s-l"></div><div class="s-m"></div><div style="height:28px"></div>'.repeat(n)}</div>`;
 
+  function getPageNumbers(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages = [];
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...');
+      pages.push(total);
+    } else if (current >= total - 3) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = total - 4; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(current - 1);
+      pages.push(current);
+      pages.push(current + 1);
+      pages.push('...');
+      pages.push(total);
+    }
+    return pages;
+  }
+
   /* ------------------------------------------------------------------ home */
   async function viewHome(q, id) {
     const sort = q.get('sort') === 'popular' ? 'popular' : 'latest';
     const f = { search: q.get('q') || '', category: q.get('category') || '', tag: q.get('tag') || '' };
     const filtered = !!(f.search || f.category || f.tag);
     const popular = sort === 'popular' && !filtered;
-    document.title = APP;
+    const pageNum = Math.max(1, parseInt(q.get('page') || '1', 10) || 1);
+    const LIMIT = 10;
+    const offset = (pageNum - 1) * LIMIT;
+
+    document.title = pageNum > 1 ? `${APP} – Page ${pageNum}` : APP;
     main.innerHTML = `<div class="home"><div></div><div>${skeleton()}</div></div>`;
 
-    const LIMIT = 12;
-    const load = (offset) => (popular ? API.popular({ limit: LIMIT, offset }) : API.posts({ search: f.search, category: f.category, tag: f.tag, limit: LIMIT, offset }));
-    const [cats, tags, page] = await Promise.all([getCats(), getTags(), load(0)]);
+    const load = (off) => (popular ? API.popular({ limit: LIMIT, offset: off }) : API.posts({ search: f.search, category: f.category, tag: f.tag, limit: LIMIT, offset: off }));
+    const [cats, tags, page] = await Promise.all([getCats(), getTags(), load(offset)]);
     if (id !== nav) return;
+
+    const totalPages = Math.ceil(page.total / LIMIT);
 
     const catName = f.category ? (cats.find((c) => c.slug === f.category) || {}).name || f.category : '';
     const tagName = f.tag ? tags.find((t) => slugify(t) === f.tag) || f.tag : '';
@@ -217,9 +247,46 @@
     else if (catName) title = catName;
     else if (tagName) title = `Tagged ${tagName}`;
 
+    if (title) {
+      document.title = pageNum > 1 ? `${title} – Page ${pageNum} – ${APP}` : `${title} – ${APP}`;
+    }
+
     const catLinks = [`<li><a href="#/" ${!filtered && !popular ? 'aria-current="true"' : ''}>All posts</a></li>`]
       .concat(cats.map((c) => `<li><a href="#/?category=${encodeURIComponent(c.slug)}" ${f.category === c.slug ? 'aria-current="true"' : ''}>${esc(c.name)}</a></li>`)).join('');
     const tagLinks = tags.slice(0, 20).map((t) => `<a href="#/?tag=${encodeURIComponent(slugify(t))}" ${f.tag === slugify(t) ? 'aria-current="true"' : ''}>${esc(t)}</a>`).join('');
+
+    const pageHref = (p) => {
+      const params = new URLSearchParams();
+      if (sort === 'popular') params.set('sort', 'popular');
+      if (f.search) params.set('q', f.search);
+      if (f.category) params.set('category', f.category);
+      if (f.tag) params.set('tag', f.tag);
+      if (p > 1) params.set('page', String(p));
+      const qs = params.toString();
+      return qs ? `#/?${qs}` : '#/';
+    };
+
+    const renderPagination = () => {
+      if (totalPages <= 1) return '';
+      const nums = getPageNumbers(pageNum, totalPages);
+      const prevBtn = pageNum > 1
+        ? `<a class="page-btn page-prev" href="${pageHref(pageNum - 1)}" rel="prev">← Previous</a>`
+        : `<span class="page-btn page-prev disabled" aria-disabled="true">← Previous</span>`;
+      const nextBtn = pageNum < totalPages
+        ? `<a class="page-btn page-next" href="${pageHref(pageNum + 1)}" rel="next">Next →</a>`
+        : `<span class="page-btn page-next disabled" aria-disabled="true">Next →</span>`;
+      const numLinks = nums.map((n) => {
+        if (n === '...') return `<span class="page-gap" aria-hidden="true">…</span>`;
+        if (n === pageNum) return `<a class="page-num active" href="${pageHref(n)}" aria-current="page">${n}</a>`;
+        return `<a class="page-num" href="${pageHref(n)}">${n}</a>`;
+      }).join('');
+
+      return `<nav class="pagination" aria-label="Pagination">
+        ${prevBtn}
+        <div class="page-numbers">${numLinks}</div>
+        ${nextBtn}
+      </nav>`;
+    };
 
     main.innerHTML = `<div class="home">
       <aside class="rail" aria-label="Browse">
@@ -232,21 +299,31 @@
       </aside>
       <section aria-label="Posts">
         ${title
-          ? `<header class="feed-head"><h1>${esc(title)}</h1><p>${plural(page.total, 'post')} <a href="#/">Clear</a></p></header>`
+          ? `<header class="feed-head"><h1>${esc(title)}</h1><p>${plural(page.total, 'post')} ${totalPages > 1 ? `· Page ${pageNum} of ${totalPages}` : ''} <a href="#/">Clear</a></p></header>`
           : `<h1 class="sr">${popular ? 'Most liked posts' : 'Latest posts'}</h1>
              <nav class="sortbar" aria-label="Order"><a href="#/" ${!popular ? 'aria-current="true"' : ''}>Latest</a><a href="#/?sort=popular" ${popular ? 'aria-current="true"' : ''}>Most liked</a></nav>`}
         <div id="feed-list"></div>
-        <button class="btn btn-ghost more" data-act="more" hidden>Show more posts</button>
+        ${renderPagination()}
       </section></div>`;
 
     const list = $('#feed-list');
     if (!page.items.length) {
-      list.innerHTML = filtered
-        ? `<div class="empty"><h2>Nothing matches</h2><p>Try fewer words, or browse all posts.</p><a class="btn btn-ghost" href="#/">Show all posts</a></div>`
-        : `<div class="empty"><h2>No posts yet</h2><p>Be the first to publish something here.</p>${S.me ? '<a class="btn" href="#/write">Write a post</a>' : '<a class="btn" href="#/register">Create an account</a>'}</div>`;
+      if (pageNum > 1 && page.total > 0) {
+        list.innerHTML = `<div class="empty"><h2>Page empty</h2><p>There are no posts on page ${pageNum}.</p><a class="btn btn-ghost" href="${pageHref(1)}">Back to first page</a></div>`;
+      } else {
+        list.innerHTML = filtered
+          ? `<div class="empty"><h2>Nothing matches</h2><p>Try fewer words, or browse all posts.</p><a class="btn btn-ghost" href="#/">Show all posts</a></div>`
+          : `<div class="empty"><h2>No posts yet</h2><p>Be the first to publish something here.</p>${S.me ? '<a class="btn" href="#/write">Write a post</a>' : '<a class="btn" href="#/register">Create an account</a>'}</div>`;
+      }
       return;
     }
-    mountList({ list, more: $('.more'), first: page, load, lead: !f.search });
+    const isFirstPage = pageNum === 1;
+    list.innerHTML = page.items.map((p, k) => entry(p, {
+      lead: !f.search && isFirstPage && k === 0,
+      i: offset + k,
+      byline: true
+    })).join('');
+    list.classList.add('anim');
   }
 
   /* ------------------------------------------------------------------ post */
