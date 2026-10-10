@@ -13,9 +13,19 @@ class Settings(BaseSettings):
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def get_allowed_origins(self) -> list[str]:
-        if isinstance(self.allowed_origins, str):
-            return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
-        return self.allowed_origins
+        raw_list = (
+            [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+            if isinstance(self.allowed_origins, str)
+            else list(self.allowed_origins)
+        )
+        cleaned = set()
+        for origin in raw_list:
+            if origin == "*":
+                cleaned.add("*")
+            else:
+                # Remove trailing slash because browsers send Origin without trailing slash
+                cleaned.add(origin.rstrip("/"))
+        return list(cleaned)
 
 
 settings = Settings()
