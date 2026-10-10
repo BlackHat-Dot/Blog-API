@@ -108,12 +108,15 @@
     .splash-line.is-on { width: 18px; border-radius: 2px; }
 
     /* The "why", said once in the middle after the posts land: short notes vs long reads */
+    /* The glyphs only (no accent dot), so the caption centres under the visible word */
+    .splash-text { position: relative; display: inline-block; }
     .splash-note {
-      position: absolute; left: 50%; top: calc(50% + clamp(3.4rem, 10vw, 4.8rem));
+      position: absolute; left: 50%; top: calc(100% + clamp(.9rem, 2.6vw, 1.5rem));
       margin: 0; z-index: 1; pointer-events: none;
       display: flex; flex-direction: column; align-items: center; gap: .35rem;
       font: italic 400 clamp(.95rem, 2.2vw, 1.2rem)/1.35 var(--serif);
       color: var(--ink-2); text-align: center; white-space: nowrap;
+      letter-spacing: normal; /* the headline's tight tracking would otherwise be inherited */
       opacity: 0; filter: blur(6px); transform: translate(-50%, .45em);
       transition: opacity 1s var(--ease), filter 1s var(--ease), transform 1s var(--ease);
     }
@@ -148,10 +151,9 @@
     <div class="splash-stage">
       <div class="splash-word pre" id="splashWord">
         <div class="splash-phys" id="splashPhys">
-          <span class="seg seg-clip" id="segA"></span><span class="seg" id="segO"></span><span class="seg seg-clip" id="segB"></span><span class="tail" id="splashTail"></span><span class="splash-line" id="splashLine"></span>
+          <span class="splash-text" id="splashText"><span class="seg seg-clip" id="segA"></span><span class="seg" id="segO"></span><span class="seg seg-clip" id="segB"></span><span class="tail" id="splashTail"></span><p class="splash-note" id="splashNote" aria-hidden="true"><span>Short isn’t always enough.</span></p></span><span class="splash-line" id="splashLine"></span>
         </div>
       </div>
-      <p class="splash-note" id="splashNote" aria-hidden="true"><span>Quick notes are everywhere.</span><span>Long reads are where the thinking lives.</span></p>
       <div class="splash-flight" id="splashFlight"></div>
     </div>
     <canvas id="splashFx"></canvas>
