@@ -779,11 +779,43 @@
 
         // Auto-fill category
         if (res.category) {
-          const matched = cats.find((c) => c.name.toLowerCase() === res.category.toLowerCase());
+          const catName = res.category.trim();
+          let matched = cats.find((c) =>
+            c.name.toLowerCase() === catName.toLowerCase() ||
+            catName.toLowerCase().includes(c.name.toLowerCase()) ||
+            c.name.toLowerCase().includes(catName.toLowerCase())
+          );
+
           if (matched) {
             cat.value = String(matched.id);
             E.category_id = matched.id;
+            newcat.hidden = true;
+          } else {
+            try {
+              // Automatically create the suggested category via API so it exists in DB & UI
+              const newCatObj = await API.createCategory(catName);
+              cats.push(newCatObj);
+              S.cats = null;
+              const opt = document.createElement('option');
+              opt.value = String(newCatObj.id);
+              opt.textContent = newCatObj.name;
+              const newOpt = cat.querySelector('option[value="__new__"]');
+              if (newOpt) cat.insertBefore(opt, newOpt);
+              else cat.appendChild(opt);
+
+              cat.value = String(newCatObj.id);
+              E.category_id = newCatObj.id;
+              newcat.hidden = true;
+            } catch {
+              cat.value = '__new__';
+              newcat.value = catName;
+              newcat.hidden = false;
+            }
           }
+          cat.classList.add('ai-filled-glow');
+        } else if (cats.length > 0 && !cat.value) {
+          cat.value = String(cats[0].id);
+          E.category_id = cats[0].id;
         }
 
         autosize(sum);
@@ -799,6 +831,7 @@
           title.classList.remove('ai-filled-glow');
           sum.classList.remove('ai-filled-glow');
           body.classList.remove('ai-filled-glow');
+          cat.classList.remove('ai-filled-glow');
         }, 1500);
 
         aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
