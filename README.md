@@ -1,4 +1,4 @@
-# Blog API
+# Longhand API
 
 A production-ready blog backend built with FastAPI, PostgreSQL, SQLAlchemy 2.0, Alembic, and JWT authentication.
 

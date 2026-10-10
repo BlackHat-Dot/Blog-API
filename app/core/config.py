@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "Blog API"
+    app_name: str = "Longhand API"
     api_v1_str: str = "/api/v1"
     secret_key: str = Field(..., validation_alias="SECRET_KEY")
     access_token_expire_minutes: int = 60 * 24 * 7
