@@ -1,6 +1,6 @@
 ================================================================================
-BLOG API - COMPLETE CODEBASE REFERENCE
-Consolidated reference containing all models, schemas, api, core, crud, db, and main.py
+LONGHAND API (BLOG API) - COMPLETE CODEBASE REFERENCE
+Consolidated reference containing all models, schemas, api, core, crud, db, main.py, and tests
 ================================================================================
 
 TABLE OF CONTENTS:
@@ -43,6 +43,8 @@ TABLE OF CONTENTS:
    - app/api/v1/users.py
    - app/api/v1/posts.py
    - app/api/v1/comments.py
+8. AUTOMATED TEST SUITE
+   - tests/test_api.py
 
 ================================================================================
 
@@ -88,10 +90,15 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.api_v1_str)
 
-@app.get("/", tags=["Health"])
-def health_check():
-    return {"status": "ok", "app": settings.app_name}
 
+@app.get("/", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
+def health_check():
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "docs": f"{settings.api_v1_str}/docs",
+    }
 
 
 ================================================================================
@@ -106,7 +113,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "Blog API"
+    app_name: str = "Longhand API"
     api_v1_str: str = "/api/v1"
     secret_key: str = Field(..., validation_alias="SECRET_KEY")
     access_token_expire_minutes: int = 60 * 24 * 7
@@ -116,14 +123,22 @@ class Settings(BaseSettings):
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def get_allowed_origins(self) -> list[str]:
-        if isinstance(self.allowed_origins, str):
-            return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
-        return self.allowed_origins
+        raw_list = (
+            [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+            if isinstance(self.allowed_origins, str)
+            else list(self.allowed_origins)
+        )
+        cleaned = set()
+        for origin in raw_list:
+            if origin == "*":
+                cleaned.add("*")
+            else:
+                # Remove trailing slash because browsers send Origin without trailing slash
+                cleaned.add(origin.rstrip("/"))
+        return list(cleaned)
 
 
 settings = Settings()
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/core/security.py
@@ -160,6 +175,7 @@ def get_password_hash(password: str) -> str:
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_str}/auth/login")
+oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_str}/auth/login", auto_error=False)
 
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
@@ -199,6 +215,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     return user
 
 
+def get_optional_current_user(
+    token: str | None = Depends(oauth2_optional_scheme),
+    session: Session = Depends(get_session),
+) -> User | None:
+    if not token:
+        return None
+    try:
+        token_data = decode_access_token(token)
+        return session.scalar(select(User).where(User.email == token_data.sub))
+    except Exception:
+        return None
 
 --------------------------------------------------------------------------------
 FILE: app/core/utils.py
@@ -222,8 +249,6 @@ def calculate_read_time(body: str, words_per_minute: int = 200) -> int:
     return max(1, math.ceil(words / words_per_minute))
 
 
-
-
 ================================================================================
 SECTION 3: DATABASE SETUP & SESSION MANAGEMENT
 ================================================================================
@@ -241,8 +266,6 @@ class Base(DeclarativeBase):
 # Import all models so SQLAlchemy registers them
 import app.models  # noqa: F401
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/db/session.py
 --------------------------------------------------------------------------------
@@ -251,7 +274,19 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-engine = create_engine(str(settings.database_url), future=True)
+db_url = str(settings.database_url)
+# Railway and Heroku often provide postgres:// or postgresql:// URLs
+# Normalize to postgresql+psycopg:// if it's a PostgreSQL URL without an explicit driver
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+engine_args = {"future": True}
+if db_url.startswith("sqlite"):
+    engine_args["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(db_url, **engine_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True, class_=Session)
 
 
@@ -262,12 +297,9 @@ def get_session():
     finally:
         session.close()
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/db/__init__.py
 --------------------------------------------------------------------------------
-
 
 
 
@@ -296,8 +328,6 @@ __all__ = [
     "Follow",
     "PostTag",
 ]
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/models/user.py
@@ -351,8 +381,6 @@ class Follow(Base):
     follower: Mapped["User"] = relationship("User", foreign_keys=[follower_id], back_populates="following")
     followed: Mapped["User"] = relationship("User", foreign_keys=[followed_id], back_populates="followers")
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/models/post.py
 --------------------------------------------------------------------------------
@@ -398,8 +426,6 @@ class Post(Base):
     likes: Mapped[list["Like"]] = relationship("Like", back_populates="post", cascade="all, delete-orphan")
     bookmarks: Mapped[list["Bookmark"]] = relationship("Bookmark", back_populates="post", cascade="all, delete-orphan")
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/models/category.py
 --------------------------------------------------------------------------------
@@ -423,8 +449,6 @@ class Category(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     posts: Mapped[List["Post"]] = relationship("Post", back_populates="category")
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/models/tag.py
@@ -456,8 +480,6 @@ class PostTag(Base):
 
     post_id: Mapped[int] = mapped_column(ForeignKey("posts.id"), primary_key=True)
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id"), primary_key=True)
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/models/comment.py
@@ -532,7 +554,6 @@ class Comment(Base):
         cascade="all, delete-orphan",
     )
 
-
 --------------------------------------------------------------------------------
 FILE: app/models/interaction.py
 --------------------------------------------------------------------------------
@@ -571,8 +592,6 @@ class Bookmark(Base):
     post: Mapped["Post"] = relationship("Post", back_populates="bookmarks")
     user: Mapped["User"] = relationship("User", back_populates="bookmarks")
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/models/blog.py
 --------------------------------------------------------------------------------
@@ -594,8 +613,6 @@ __all__ = [
     "Follow",
     "PostTag",
 ]
-
-
 
 
 ================================================================================
@@ -628,14 +645,42 @@ __all__ = [
     "UserRead",
 ]
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/schemas/user.py
 --------------------------------------------------------------------------------
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+import re
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+# Strict Google Gmail username and domain compilation rules:
+# 1. Domain must strictly be @gmail.com
+# 2. Local part (username before @gmail.com) must be between 6 and 30 characters
+# 3. Only alphanumeric characters (a-z, 0-9) and periods (.) are allowed (no underscores, hyphens, plus signs, etc.)
+# 4. Cannot begin or end with a period (.)
+# 5. Cannot have consecutive periods (..)
+GMAIL_USERNAME_ALLOWED_CHARS = re.compile(r"^[a-z0-9.]+$")
+
+
+def validate_gmail_address(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned.endswith("@gmail.com"):
+        raise ValueError("Fix email: only @gmail.com addresses are allowed (e.g. yourname@gmail.com)")
+
+    username = cleaned[:-10]
+    if len(username) < 6 or len(username) > 30:
+        raise ValueError("Fix email: Gmail username must be between 6 and 30 characters long")
+
+    if not GMAIL_USERNAME_ALLOWED_CHARS.match(username):
+        raise ValueError("Fix email: Gmail username can only contain letters (a-z), numbers (0-9), and periods (.)")
+
+    if username.startswith(".") or username.endswith("."):
+        raise ValueError("Fix email: Gmail username cannot begin or end with a period")
+
+    if ".." in username:
+        raise ValueError("Fix email: Gmail username cannot contain consecutive periods (..)")
+
+    return cleaned
 
 
 class UserCreate(BaseModel):
@@ -643,10 +688,25 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8)
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        return validate_gmail_address(str(v))
+
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        return validate_gmail_address(str(v))
+
+
+class UserUpdate(BaseModel):
+    username: str | None = Field(None, min_length=3, max_length=50)
+    bio: str | None = None
 
 
 class UserRead(BaseModel):
@@ -669,8 +729,6 @@ class Profile(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/schemas/post.py
@@ -729,6 +787,8 @@ class PostResponse(BaseModel):
     comment_count: int = 0
     created_at: datetime
     updated_at: datetime
+    is_liked: bool = False
+    is_bookmarked: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -738,8 +798,6 @@ class PaginatedPosts(BaseModel):
     limit: int
     offset: int
     items: list[PostResponse]
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/schemas/category.py
@@ -759,19 +817,24 @@ class CategoryRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/schemas/comment.py
 --------------------------------------------------------------------------------
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class CommentCreate(BaseModel):
     body: str = Field(..., min_length=1)
     parent_id: int | None = None
+
+
+class CommentAuthor(BaseModel):
+    id: int
+    username: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommentRead(BaseModel):
@@ -781,10 +844,19 @@ class CommentRead(BaseModel):
     post_id: int
     parent_id: int | None = None
     created_at: datetime
+    author: CommentAuthor | None = None
+
+    @computed_field
+    @property
+    def author_username(self) -> str | None:
+        return self.author.username if self.author else None
+
+    @computed_field
+    @property
+    def username(self) -> str | None:
+        return self.author.username if self.author else None
 
     model_config = ConfigDict(from_attributes=True)
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/schemas/token.py
@@ -804,8 +876,6 @@ class TokenPayload(BaseModel):
     exp: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-
 
 
 ================================================================================
@@ -861,8 +931,6 @@ __all__ = [
     "get_follow",
 ]
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/crud/user.py
 --------------------------------------------------------------------------------
@@ -899,8 +967,6 @@ def authenticate_user(session: Session, email: str, password: str) -> User | Non
     if not user or not verify_password(password, user.password_hash):
         return None
     return user
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/crud/post.py
@@ -1106,8 +1172,6 @@ def get_popular_posts(session: Session, limit: int = 10, offset: int = 0):
     rows = session.execute(statement).all()
     return rows, total
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/crud/comment.py
 --------------------------------------------------------------------------------
@@ -1117,6 +1181,8 @@ from sqlalchemy.orm import Session
 from app.models import Comment, Post
 from app.schemas.comment import CommentCreate
 
+
+from sqlalchemy.orm import selectinload
 
 def create_comment(session: Session, post_id: int, author_id: int, comment_data: CommentCreate) -> Comment:
     if not session.get(Post, post_id):
@@ -1135,20 +1201,25 @@ def create_comment(session: Session, post_id: int, author_id: int, comment_data:
     )
     session.add(comment)
     session.commit()
-    session.refresh(comment)
-    return comment
+    statement = select(Comment).options(selectinload(Comment.author)).where(Comment.id == comment.id)
+    return session.scalar(statement)
 
 
 def list_comments(session: Session, post_id: int, limit: int = 20, offset: int = 0) -> list[Comment]:
-    statement = select(Comment).where(Comment.post_id == post_id).order_by(Comment.created_at.asc()).limit(limit).offset(offset)
+    statement = (
+        select(Comment)
+        .options(selectinload(Comment.author))
+        .where(Comment.post_id == post_id)
+        .order_by(Comment.created_at.asc())
+        .limit(limit)
+        .offset(offset)
+    )
     return session.scalars(statement).all()
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/crud/interaction.py
 --------------------------------------------------------------------------------
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Bookmark, Follow, Like, Post, User
@@ -1222,6 +1293,26 @@ def remove_bookmark(session: Session, user_id: int, post_id: int) -> bool:
     return True
 
 
+def list_user_bookmarks(
+    session: Session,
+    user_id: int,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Post], int]:
+    total = session.scalar(
+        select(func.count(Bookmark.id)).where(Bookmark.user_id == user_id)
+    ) or 0
+
+    statement = (
+        select(Post)
+        .join(Bookmark, Bookmark.post_id == Post.id)
+        .where(Bookmark.user_id == user_id)
+        .order_by(Bookmark.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    posts = session.scalars(statement).all()
+    return posts, total
 
 
 ================================================================================
@@ -1231,7 +1322,6 @@ SECTION 7: API ROUTERS & ENDPOINTS (V1)
 --------------------------------------------------------------------------------
 FILE: app/api/__init__.py
 --------------------------------------------------------------------------------
-
 
 
 --------------------------------------------------------------------------------
@@ -1246,8 +1336,6 @@ api_router.include_router(auth.router, tags=["Authentication"])
 api_router.include_router(users.router, tags=["Users"])
 api_router.include_router(posts.router, tags=["Posts"])
 api_router.include_router(comments.router, tags=["Comments"])
-
-
 
 --------------------------------------------------------------------------------
 FILE: app/api/v1/auth.py
@@ -1281,8 +1369,6 @@ def login(user_login: UserLogin, session: Session = Depends(get_session)):
     access_token = create_access_token(subject=user.email)
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/api/v1/users.py
 --------------------------------------------------------------------------------
@@ -1291,38 +1377,50 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_current_user
 from app.crud.user import get_user_by_username
 from app.crud.interaction import get_follow, follow_author, unfollow_author
 from app.db.session import get_session
 from app.models import Follow, Post, User
-from app.schemas.user import Profile, UserRead
+from app.schemas.user import Profile, UserRead, UserUpdate
 
 router = APIRouter(prefix="")
 
 
-from fastapi.security import OAuth2PasswordBearer
-from app.core.security import decode_access_token
-from app.crud.user import get_user_by_email
-
-oauth2_optional_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_str}/auth/login", auto_error=False)
-
-
-def get_optional_current_user(
-    token: str | None = Depends(oauth2_optional_scheme),
-    session: Session = Depends(get_session),
-) -> User | None:
-    if not token:
-        return None
-    try:
-        token_data = decode_access_token(token)
-        return get_user_by_email(session, token_data.sub)
-    except Exception:
-        return None
-
-
 @router.get("/users/me", response_model=UserRead)
 def read_current_user(current_user=Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/users/me", response_model=UserRead)
+def update_current_user(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    if user_update.username is not None:
+        new_username = user_update.username.strip()
+        if not new_username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username cannot be empty",
+            )
+        # Check if username is already taken by another user
+        if new_username != current_user.username:
+            existing = get_user_by_username(session, new_username)
+            if existing and existing.id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username is already taken",
+                )
+            current_user.username = new_username
+
+    if user_update.bio is not None:
+        current_user.bio = user_update.bio.strip() or None
+
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
     return current_user
 
 
@@ -1375,8 +1473,6 @@ def unfollow(username: str, current_user=Depends(get_current_user), session: Ses
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not following this author")
     return None
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/api/v1/posts.py
 --------------------------------------------------------------------------------
@@ -1384,24 +1480,37 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_current_user
 from app.core.utils import slugify
 from app.crud.interaction import (
     bookmark_post,
     like_post,
+    list_user_bookmarks,
     remove_bookmark,
     unlike_post,
 )
 from app.crud.post import create_post, get_category, get_or_create_tags, get_post, get_post_by_slug, get_popular_posts, list_posts, update_post
 from app.db.session import get_session
-from app.models import Category, Tag
+from app.models import Category, Tag, User
 from app.schemas.category import CategoryCreate, CategoryRead
 from app.schemas.post import PaginatedPosts, PostCreate, PostResponse, PostUpdate
 
 router = APIRouter(prefix="")
 
 
-def _build_post_response(post, like_count: int | None = None, bookmark_count: int | None = None) -> PostResponse:
+def _build_post_response(
+    post,
+    like_count: int | None = None,
+    bookmark_count: int | None = None,
+    viewer: User | None = None,
+    is_liked: bool | None = None,
+    is_bookmarked: bool | None = None,
+) -> PostResponse:
+    if is_liked is None:
+        is_liked = any(l.user_id == viewer.id for l in post.likes) if viewer else False
+    if is_bookmarked is None:
+        is_bookmarked = any(b.user_id == viewer.id for b in post.bookmarks) if viewer else False
+
     return PostResponse(
         id=post.id,
         title=post.title,
@@ -1419,6 +1528,8 @@ def _build_post_response(post, like_count: int | None = None, bookmark_count: in
         comment_count=len(post.comments),
         created_at=post.created_at,
         updated_at=post.updated_at,
+        is_liked=is_liked,
+        is_bookmarked=is_bookmarked,
     )
 
 
@@ -1431,6 +1542,7 @@ def read_posts(
     state: str = Query("published", pattern=r"^(draft|published)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    viewer: User | None = Depends(get_optional_current_user),
     session: Session = Depends(get_session),
 ):
     posts, total = list_posts(session, search, category, tag, author, state, limit, offset)
@@ -1438,7 +1550,7 @@ def read_posts(
         "total": total,
         "limit": limit,
         "offset": offset,
-        "items": [_build_post_response(post) for post in posts],
+        "items": [_build_post_response(post, viewer=viewer) for post in posts],
     }
 
 
@@ -1446,19 +1558,45 @@ def read_posts(
 def read_popular_posts(
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
+    viewer: User | None = Depends(get_optional_current_user),
     session: Session = Depends(get_session),
 ):
     rows, total = get_popular_posts(session, limit, offset)
-    items = [_build_post_response(post, like_count=like_count) for post, like_count in rows]
+    items = [_build_post_response(post, like_count=like_count, viewer=viewer) for post, like_count in rows]
     return {"total": total, "limit": limit, "offset": offset, "items": items}
 
 
+@router.get("/bookmarks", response_model=PaginatedPosts)
+@router.get("/posts/bookmarks", response_model=PaginatedPosts)
+@router.get("/users/me/bookmarks", response_model=PaginatedPosts)
+def read_user_bookmarks(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    posts, total = list_user_bookmarks(session, current_user.id, limit, offset)
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            _build_post_response(post, viewer=current_user, is_bookmarked=True)
+            for post in posts
+        ],
+    }
+
+
 @router.get("/posts/{post_id}", response_model=PostResponse)
-def read_post(post_id: int, session: Session = Depends(get_session)):
+def read_post(
+    post_id: int,
+    viewer: User | None = Depends(get_optional_current_user),
+    session: Session = Depends(get_session),
+):
     post = get_post(session, post_id)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    return _build_post_response(post)
+    return _build_post_response(post, viewer=viewer)
 
 
 @router.post("/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
@@ -1466,7 +1604,7 @@ def create_new_post(post_input: PostCreate, current_user=Depends(get_current_use
     if post_input.category_id is not None and not get_category(session, post_input.category_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     post = create_post(session, current_user.id, post_input)
-    return _build_post_response(post)
+    return _build_post_response(post, viewer=current_user)
 
 
 @router.put("/posts/{post_id}", response_model=PostResponse)
@@ -1479,7 +1617,7 @@ def edit_post(post_id: int, post_update: PostUpdate, current_user=Depends(get_cu
     if post_update.category_id is not None and post_update.category_id and not get_category(session, post_update.category_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     updated = update_post(session, post, post_update)
-    return _build_post_response(updated)
+    return _build_post_response(updated, viewer=current_user)
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -1555,8 +1693,6 @@ def create_category(category_input: CategoryCreate, current_user=Depends(get_cur
 def list_tags(session: Session = Depends(get_session)):
     return [tag.name for tag in session.scalars(select(Tag).order_by(Tag.name)).all()]
 
-
-
 --------------------------------------------------------------------------------
 FILE: app/api/v1/comments.py
 --------------------------------------------------------------------------------
@@ -1599,3 +1735,339 @@ def get_comments(
     return list_comments(session, post_id, limit, offset)
 
 
+================================================================================
+SECTION 8: AUTOMATED TEST SUITE
+================================================================================
+
+--------------------------------------------------------------------------------
+FILE: tests/test_api.py
+--------------------------------------------------------------------------------
+import os
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+os.environ["SECRET_KEY"] = "super-secret-key-for-testing-at-least-32-chars-long"
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+
+from app.db.base import Base
+from app.db.session import get_session
+from app.main import app
+
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    Base.metadata.create_all(bind=test_engine)
+    yield
+    Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture
+def session():
+    connection = test_engine.connect()
+    transaction = connection.begin()
+    db = TestingSessionLocal(bind=connection)
+
+    yield db
+
+    db.close()
+    transaction.rollback()
+    connection.close()
+
+
+@pytest.fixture
+def client(session):
+    def override_get_session():
+        yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+def test_health_check(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_auth_and_user_flows(client):
+    # Register user 1
+    reg_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "author1@gmail.com", "username": "author1", "password": "Password123!"},
+    )
+    assert reg_res.status_code == 201
+    user1 = reg_res.json()
+    assert user1["username"] == "author1"
+    assert "password_hash" not in user1
+
+    # Register duplicate email
+    dup_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "author1@gmail.com", "username": "author2", "password": "Password123!"},
+    )
+    assert dup_res.status_code == 400
+
+    # Test rejection of non-gmail and invalid Gmail username compilation rules:
+    # 1. Non-gmail domain
+    # 2. Too short (< 6 chars)
+    # 3. Too long (> 30 chars)
+    # 4. Leading / trailing period
+    # 5. Consecutive periods
+    # 6. Disallowed characters (underscores, hyphens, plus)
+    for bad_email in [
+        "author1@example.com",
+        "user@yahoo.com",
+        "abc@gmail.com",
+        "a" * 31 + "@gmail.com",
+        ".leading@gmail.com",
+        "trailing.@gmail.com",
+        "double..dot@gmail.com",
+        "user_name@gmail.com",
+        "user-name@gmail.com",
+        "user+tag@gmail.com",
+    ]:
+        bad_res = client.post(
+            "/api/v1/auth/register",
+            json={"email": bad_email, "username": "baduser", "password": "Password123!"},
+        )
+        assert bad_res.status_code == 422, f"Expected 422 for bad email: {bad_email}"
+        assert "Fix email" in bad_res.text or "Value error" in bad_res.text
+
+    # Register duplicate username
+    dup_user = client.post(
+        "/api/v1/auth/register",
+        json={"email": "other.author@gmail.com", "username": "author1", "password": "Password123!"},
+    )
+    assert dup_user.status_code == 400
+
+    # Login
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "author1@gmail.com", "password": "Password123!"},
+    )
+    assert login_res.status_code == 200
+    token1 = login_res.json()["access_token"]
+    headers1 = {"Authorization": f"Bearer {token1}"}
+
+    # /users/me
+    me_res = client.get("/api/v1/users/me", headers=headers1)
+    assert me_res.status_code == 200
+    assert me_res.json()["username"] == "author1"
+
+    # Edit profile: update bio
+    edit_bio_res = client.put("/api/v1/users/me", json={"bio": "Writer and explorer"}, headers=headers1)
+    assert edit_bio_res.status_code == 200
+    assert edit_bio_res.json()["bio"] == "Writer and explorer"
+
+    # Edit profile: change username
+    edit_user_res = client.put("/api/v1/users/me", json={"username": "author_prime"}, headers=headers1)
+    assert edit_user_res.status_code == 200
+    assert edit_user_res.json()["username"] == "author_prime"
+
+    # Edit profile: change back to author1
+    client.put("/api/v1/users/me", json={"username": "author1"}, headers=headers1)
+
+    # Register user 2
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "reader123@gmail.com", "username": "reader", "password": "Password123!"},
+    )
+    login_res2 = client.post(
+        "/api/v1/auth/login",
+        json={"email": "reader123@gmail.com", "password": "Password123!"},
+    )
+    token2 = login_res2.json()["access_token"]
+    headers2 = {"Authorization": f"Bearer {token2}"}
+
+    # Attempt to change reader's username to author1 (should fail with 400 - already taken)
+    dup_edit_res = client.put("/api/v1/users/me", json={"username": "author1"}, headers=headers2)
+    assert dup_edit_res.status_code == 400
+    assert "already taken" in dup_edit_res.json()["detail"].lower()
+
+    # Follow author1 by reader
+    follow_res = client.post("/api/v1/profiles/author1/follow", headers=headers2)
+    assert follow_res.status_code == 204
+
+    # Cannot follow self
+    follow_self = client.post("/api/v1/profiles/author1/follow", headers=headers1)
+    assert follow_self.status_code == 400
+
+    # Profile view as reader (should show is_following=True)
+    prof_res = client.get("/api/v1/profiles/author1", headers=headers2)
+    assert prof_res.status_code == 200
+    data = prof_res.json()
+    assert data["is_following"] is True
+    assert data["follower_count"] == 1
+
+    # Profile view anonymous
+    prof_anon = client.get("/api/v1/profiles/author1")
+    assert prof_anon.status_code == 200
+    assert prof_anon.json()["is_following"] is False
+
+    # Unfollow
+    unfollow_res = client.delete("/api/v1/profiles/author1/follow", headers=headers2)
+    assert unfollow_res.status_code == 204
+
+
+def test_post_and_comment_lifecycle(client):
+    # Setup author
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "blogger@gmail.com", "username": "blogger", "password": "Password123!"},
+    )
+    token = client.post(
+        "/api/v1/auth/login",
+        json={"email": "blogger@gmail.com", "password": "Password123!"},
+    ).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create category
+    cat_res = client.post(
+        "/api/v1/categories",
+        json={"name": "Technology"},
+        headers=headers,
+    )
+    assert cat_res.status_code == 201
+    cat_id = cat_res.json()["id"]
+
+    # Duplicate category rejection
+    cat_dup = client.post("/api/v1/categories", json={"name": "Technology"}, headers=headers)
+    assert cat_dup.status_code == 400
+
+    # Create post
+    post_res = client.post(
+        "/api/v1/posts",
+        json={
+            "title": "Mastering FastAPI and SQLAlchemy 2.0",
+            "summary": "A deep dive tutorial",
+            "body": "This is a detailed technical guide with well more than twenty characters of meaningful content.",
+            "category_id": cat_id,
+            "tags": ["python", "fastapi"],
+            "state": "published",
+        },
+        headers=headers,
+    )
+    assert post_res.status_code == 201
+    post_data = post_res.json()
+    post_id = post_data["id"]
+    assert post_data["author"]["username"] == "blogger"
+    assert post_data["category"]["name"] == "Technology"
+    assert len(post_data["tags"]) == 2
+    assert post_data["read_time"] >= 1
+
+    # Read post
+    get_res = client.get(f"/api/v1/posts/{post_id}")
+    assert get_res.status_code == 200
+    assert get_res.json()["title"] == "Mastering FastAPI and SQLAlchemy 2.0"
+
+    # Search & filters
+    search_res = client.get("/api/v1/posts?search=Mastering&tag=python")
+    assert search_res.status_code == 200
+    assert search_res.json()["total"] == 1
+    assert len(search_res.json()["items"]) == 1
+
+    # Like post
+    like_res = client.post(f"/api/v1/posts/{post_id}/like", headers=headers)
+    assert like_res.status_code == 201
+
+    # Popular posts
+    pop_res = client.get("/api/v1/posts/popular")
+    assert pop_res.status_code == 200
+    assert pop_res.json()["total"] == 1
+    assert pop_res.json()["items"][0]["like_count"] == 1
+
+    # Unlike post
+    unlike_res = client.delete(f"/api/v1/posts/{post_id}/like", headers=headers)
+    assert unlike_res.status_code == 204
+
+    # Add root comment
+    comm_res = client.post(
+        f"/api/v1/posts/{post_id}/comments",
+        json={"body": "Great article!"},
+        headers=headers,
+    )
+    assert comm_res.status_code == 201
+    parent_comment_id = comm_res.json()["id"]
+
+    # Add reply comment
+    reply_res = client.post(
+        f"/api/v1/posts/{post_id}/comments",
+        json={"body": "Thanks for reading!", "parent_id": parent_comment_id},
+        headers=headers,
+    )
+    assert reply_res.status_code == 201
+    assert reply_res.json()["parent_id"] == parent_comment_id
+
+    # List comments
+    comments_res = client.get(f"/api/v1/posts/{post_id}/comments")
+    assert comments_res.status_code == 200
+    comments_data = comments_res.json()
+    assert len(comments_data) == 2
+    # Verify comments include author username and computed aliases
+    assert comments_data[0]["author"] is not None
+    assert comments_data[0]["author"]["username"] == "blogger"
+    assert comments_data[0]["author_username"] == "blogger"
+    assert comments_data[0]["username"] == "blogger"
+
+    # Test is_liked and is_bookmarked dynamic status
+    unauth_post = client.get(f"/api/v1/posts/{post_id}").json()
+    assert unauth_post["is_liked"] is False
+    assert unauth_post["is_bookmarked"] is False
+
+    auth_post_initial = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_initial["is_liked"] is False
+    assert auth_post_initial["is_bookmarked"] is False
+
+    # Like and Bookmark
+    client.post(f"/api/v1/posts/{post_id}/like", headers=headers)
+    client.post(f"/api/v1/posts/{post_id}/bookmark", headers=headers)
+
+    auth_post_after = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_after["is_liked"] is True
+    assert auth_post_after["is_bookmarked"] is True
+
+    # Check unauthenticated view still returns False
+    unauth_after = client.get(f"/api/v1/posts/{post_id}").json()
+    assert unauth_after["is_liked"] is False
+    assert unauth_after["is_bookmarked"] is False
+
+    # Check bookmarks listing endpoints
+    unauth_bm = client.get("/api/v1/bookmarks")
+    assert unauth_bm.status_code == 401
+
+    bm_res = client.get("/api/v1/bookmarks", headers=headers)
+    assert bm_res.status_code == 200
+    bm_data = bm_res.json()
+    assert bm_data["total"] == 1
+    assert len(bm_data["items"]) == 1
+    assert bm_data["items"][0]["id"] == post_id
+    assert bm_data["items"][0]["is_bookmarked"] is True
+
+    # Check /posts/bookmarks and /users/me/bookmarks aliases
+    assert client.get("/api/v1/posts/bookmarks", headers=headers).status_code == 200
+    assert client.get("/api/v1/users/me/bookmarks", headers=headers).status_code == 200
+
+    # Unbookmark & Unlike
+    del_bm = client.delete(f"/api/v1/posts/{post_id}/bookmark", headers=headers)
+    assert del_bm.status_code == 204
+    del_like = client.delete(f"/api/v1/posts/{post_id}/like", headers=headers)
+    assert del_like.status_code == 204
+
+    # Verify bookmarks empty and post flags reverted
+    bm_res_after = client.get("/api/v1/bookmarks", headers=headers).json()
+    assert bm_res_after["total"] == 0
+    auth_post_clean = client.get(f"/api/v1/posts/{post_id}", headers=headers).json()
+    assert auth_post_clean["is_liked"] is False
+    assert auth_post_clean["is_bookmarked"] is False
