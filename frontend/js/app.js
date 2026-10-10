@@ -681,9 +681,50 @@
 
     let selectedTone = '';
 
-    const toggleAiPanel = () => {
-      const isHidden = aiBody.hidden;
-      aiBody.hidden = !isHidden;
+    const clearEditorFields = () => {
+      title.value = '';
+      E.title = '';
+      sum.value = '';
+      E.summary = '';
+      body.value = '';
+      E.body = '';
+      E.tags = [];
+      drawChips();
+      cat.value = '';
+      E.category_id = '';
+      newcat.value = '';
+      newcat.hidden = true;
+      autosize(sum);
+      autosize(body);
+      stats();
+      persist();
+    };
+
+    const hasExistingContent = () => {
+      return !!(title.value.trim() || sum.value.trim() || body.value.trim() || E.tags.length > 0);
+    };
+
+    const confirmAiOverwrite = async () => {
+      if (!hasExistingContent()) return true;
+      return await confirmDialog({
+        title: 'Overwrite existing post?',
+        body: 'You already have content in your post. Would you like to clear and replace it with this AI generation?',
+        confirm: 'Yes, overwrite post',
+      });
+    };
+
+    const toggleAiPanel = async () => {
+      const willOpen = aiBody.hidden;
+      if (willOpen && hasExistingContent()) {
+        const ok = await confirmDialog({
+          title: 'Start fresh with AI?',
+          body: 'You have existing content in your post. Do you want to clear your current draft to write a fresh post with AI?',
+          confirm: 'Clear & Start AI',
+        });
+        if (!ok) return;
+        clearEditorFields();
+      }
+      aiBody.hidden = !willOpen;
       aiPanel.classList.toggle('open', !aiBody.hidden);
       aiExpandBtn.textContent = aiBody.hidden ? 'Expand' : 'Collapse';
       if (!aiBody.hidden) aiTopicIn.focus();
@@ -770,6 +811,13 @@
         return;
       }
 
+      // Check if user has existing content before generating/overwriting
+      if (hasExistingContent()) {
+        const ok = await confirmAiOverwrite();
+        if (!ok) return;
+        clearEditorFields();
+      }
+
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;
       aiStatus.hidden = false;
@@ -789,9 +837,9 @@
         body.value = res.body;
         E.body = res.body;
 
-        // Auto-fill tags
+        // Auto-fill tags cleanly
         if (Array.isArray(res.tags)) {
-          E.tags = Array.from(new Set([...E.tags, ...res.tags]));
+          E.tags = [...res.tags];
           drawChips();
         }
 
@@ -855,7 +903,9 @@
         aiStatus.textContent = '✅ Post generated with impeccable grammar and structure!';
         toast('AI post draft generated!');
         setTimeout(() => {
-          toggleAiPanel();
+          aiBody.hidden = true;
+          aiPanel.classList.remove('open');
+          aiExpandBtn.textContent = 'Expand';
           title.focus();
         }, 1200);
       } catch (err) {
