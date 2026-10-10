@@ -566,16 +566,6 @@
             <button type="button" class="btn-quiet" id="ai-expand-btn">Expand</button>
           </div>
           <div class="ai-body" id="ai-body" hidden>
-            <div class="ai-key-bar">
-              <div class="ai-key-label-group">
-                <span class="ai-key-icon">🔑</span>
-                <span class="ai-key-title">Gemini API Key:</span>
-                <input type="password" class="ai-key-input" id="ai-key-in" placeholder="Paste Gemini API key (saved in browser)" autocomplete="off">
-                <button type="button" class="btn-quiet" id="ai-key-save-btn" style="padding:2px 8px;font-size:12px">Save</button>
-                <span class="ai-key-status" id="ai-key-status"></span>
-              </div>
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="ai-key-link">Get free key ↗</a>
-            </div>
             <div class="ai-input-group">
               <input type="text" class="ai-input" id="ai-topic-in" placeholder="Depict your idea (e.g. Why Postgres connection pooling & WAL matter)..." autocomplete="off">
               <button type="button" class="btn" id="ai-tones-btn">Discover Tones</button>
@@ -684,37 +674,6 @@
     const aiCustomToneIn = $('#ai-custom-tone-in', f);
     const aiWriteBtn = $('#ai-write-btn', f);
 
-    const aiKeyIn = $('#ai-key-in', f);
-    const aiKeySaveBtn = $('#ai-key-save-btn', f);
-    const aiKeyStatus = $('#ai-key-status', f);
-
-    const updateKeyStatus = () => {
-      const k = API.getGeminiKey();
-      if (k) {
-        aiKeyStatus.className = 'ai-key-status connected';
-        aiKeyStatus.textContent = '● Key Active';
-        if (!aiKeyIn.value) aiKeyIn.value = k;
-      } else {
-        aiKeyStatus.className = 'ai-key-status unconfigured';
-        aiKeyStatus.textContent = '○ Key Required';
-      }
-    };
-    updateKeyStatus();
-
-    aiKeySaveBtn.onclick = () => {
-      const val = aiKeyIn.value.trim();
-      API.setGeminiKey(val);
-      updateKeyStatus();
-      toast(val ? 'Gemini API key saved in browser!' : 'Gemini API key cleared.');
-    };
-
-    aiKeyIn.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        aiKeySaveBtn.click();
-      }
-    };
-
     let selectedTone = '';
 
     const toggleAiPanel = () => {
@@ -722,10 +681,7 @@
       aiBody.hidden = !isHidden;
       aiPanel.classList.toggle('open', !aiBody.hidden);
       aiExpandBtn.textContent = aiBody.hidden ? 'Expand' : 'Collapse';
-      if (!aiBody.hidden) {
-        if (!API.getGeminiKey()) aiKeyIn.focus();
-        else aiTopicIn.focus();
-      }
+      if (!aiBody.hidden) aiTopicIn.focus();
     };
 
     aiHeadToggle.onclick = (e) => {
@@ -739,16 +695,6 @@
       if (!topic) {
         aiStatus.hidden = false;
         aiStatus.textContent = 'Please depict your topic or idea first.';
-        return;
-      }
-      if (aiKeyIn.value.trim() && !API.getGeminiKey()) {
-        API.setGeminiKey(aiKeyIn.value.trim());
-        updateKeyStatus();
-      }
-      if (!API.getGeminiKey()) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = '🔑 Please paste your Google Gemini API key above to discover smart tones and write with Gemini AI (free key: https://aistudio.google.com/app/apikey).';
-        aiKeyIn.focus();
         return;
       }
       aiTonesBtn.disabled = true;
@@ -803,16 +749,6 @@
       const topic = aiTopicIn.value.trim();
       const tone = (aiCustomToneIn.value.trim() || selectedTone).trim();
       if (!topic || !tone) return;
-      if (aiKeyIn.value.trim() && !API.getGeminiKey()) {
-        API.setGeminiKey(aiKeyIn.value.trim());
-        updateKeyStatus();
-      }
-      if (!API.getGeminiKey()) {
-        aiStatus.hidden = false;
-        aiStatus.textContent = '🔑 Please paste your Google Gemini API key above to write your post with Gemini AI.';
-        aiKeyIn.focus();
-        return;
-      }
 
       aiWriteBtn.disabled = true;
       aiTonesBtn.disabled = true;

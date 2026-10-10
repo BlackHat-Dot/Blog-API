@@ -1582,12 +1582,8 @@ def suggest_tones(
         return SuggestTonesResponse(topic=request.prompt, tones=tones)
 
     raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "Gemini API key is not configured. "
-            "Please paste your Google Gemini API key in the 'Write with AI' settings panel or set GEMINI_API_KEY in your server's .env file. "
-            "You can obtain a free key at https://aistudio.google.com/app/apikey"
-        ),
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="AI service is not configured on this server. Please ensure GEMINI_API_KEY is set in server environment variables.",
     )
 
 
@@ -1634,12 +1630,8 @@ STRICT EDITORIAL & TECHNICAL QUALITY STANDARDS:
         return _generate_post_fallback(request.prompt, request.tone, request.existing_categories)
 
     raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "Gemini API key is not configured. "
-            "Please paste your Google Gemini API key in the 'Write with AI' settings panel or set GEMINI_API_KEY in your server's .env file. "
-            "You can obtain a free key at https://aistudio.google.com/app/apikey"
-        ),
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="AI service is not configured on this server. Please ensure GEMINI_API_KEY is set in server environment variables.",
     )
 
 

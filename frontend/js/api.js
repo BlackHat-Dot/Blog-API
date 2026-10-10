@@ -30,23 +30,6 @@
     },
   };
 
-  const GEMINI_KEY = 'longhand.gemini_key';
-  let _memGeminiKey = null;
-  const geminiKey = {
-    get() {
-      try {
-        const k = localStorage.getItem(GEMINI_KEY);
-        if (k) return k;
-      } catch { /* storage blocked */ }
-      return _memGeminiKey;
-    },
-    set(k) {
-      _memGeminiKey = k ? k.trim() : null;
-      try {
-        k ? localStorage.setItem(GEMINI_KEY, k.trim()) : localStorage.removeItem(GEMINI_KEY);
-      } catch { /* storage blocked */ }
-    },
-  };
 
   function detailText(d) {
     if (!d) return '';
@@ -119,10 +102,8 @@
     unbookmark: (id) => call('DELETE', `/posts/${id}/bookmark`),
     bookmarks: (q) => call('GET', '/bookmarks', { query: q }),
 
-    getGeminiKey: () => geminiKey.get(),
-    setGeminiKey: (k) => geminiKey.set(k),
-    suggestTones: (prompt, apiKey) => call('POST', '/ai/suggest-tones', { body: { prompt, api_key: (apiKey !== undefined ? apiKey : geminiKey.get()) || null } }),
-    generatePost: (prompt, tone, existingCategories, apiKey) => call('POST', '/ai/generate-post', { body: { prompt, tone, existing_categories: existingCategories, api_key: (apiKey !== undefined ? apiKey : geminiKey.get()) || null } }),
+    suggestTones: (prompt) => call('POST', '/ai/suggest-tones', { body: { prompt } }),
+    generatePost: (prompt, tone, existingCategories) => call('POST', '/ai/generate-post', { body: { prompt, tone, existing_categories: existingCategories } }),
 
     categories: () => call('GET', '/categories'),
     createCategory: (name) => call('POST', '/categories', { body: { name } }),
