@@ -20,7 +20,9 @@
   --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease: cubic-bezier(.2, .7, .2, 1);
-  --wrap: 1280px;
+  --wrap: 1280px;                 /* reading width for post, profile and editor pages */
+  --gutter: clamp(20px, 3vw, 56px); /* side space for header, feed and footer */
+  --full: 2200px;                 /* stops the layout stretching on very wide screens */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,7 +80,7 @@ button { font: inherit; color: inherit; }
 /* ---------- header ---------- */
 .bar { border-bottom: 1px solid var(--line); }
 .bar-in {
-  max-width: var(--wrap); margin: 0 auto; padding: 18px 24px;
+  max-width: var(--full); margin: 0 auto; padding: 18px var(--gutter);
   display: flex; align-items: center; gap: 28px;
 }
 .brand {
@@ -161,8 +163,8 @@ label, legend { font-weight: 500; }
 
 /* ---------- layout ---------- */
 .home {
-  display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 64px;
-  max-width: var(--wrap); margin: 0 auto; padding: 48px 24px 96px;
+  display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 72px;
+  max-width: var(--full); margin: 0 auto; padding: 48px var(--gutter) 96px;
 }
 .rail { align-self: start; position: sticky; top: 28px; font-size: 15px; }
 .rail h2 { font: 600 14px/1.3 var(--sans); color: var(--mute); margin: 0 0 10px; }
@@ -439,7 +441,7 @@ dialog p { color: var(--ink-2); margin-bottom: 22px; }
 .toast.bad { background: var(--bad); color: #fff; }
 .toast.out { opacity: 0; transform: translateY(6px); }
 
-.foot { max-width: var(--wrap); margin: 0 auto; padding: 28px 24px 48px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); color: var(--mute); font-size: 14px; }
+.foot { max-width: var(--full); margin: 0 auto; padding: 28px var(--gutter) 48px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); color: var(--mute); font-size: 14px; }
 .foot a { color: inherit; }
 
 /* ---------- responsive ---------- */
