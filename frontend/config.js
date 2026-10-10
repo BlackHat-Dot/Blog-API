@@ -12,16 +12,21 @@
   }
   const storedApi = (() => { try { return localStorage.getItem('longhand.apiBase'); } catch (_) { return null; } })();
 
-  let defaultBase = "https://blog-api-production-76b4.up.railway.app";
-  if (window.location && window.location.origin) {
-    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-      // If deployed on Vercel and no backend set, default to Railway/backend or same-origin
-      defaultBase = window.LONGHAND_API_BASE || (window.location.origin + "/api/v1");
+  const RAILWAY_BACKEND_API = "https://blog-api-production-76b4.up.railway.app/api/v1";
+
+  // Check stored override or URL parameter
+  let base = storedApi || paramApi;
+  if (!base) {
+    if (window.location && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      base = "http://localhost:8000/api/v1";
+    } else {
+      // Vercel / Production deployment: use the live Railway backend
+      base = RAILWAY_BACKEND_API;
     }
   }
 
   window.LONGHAND = {
     appName: "Blog API",
-    apiBase: storedApi || paramApi || defaultBase,
+    apiBase: base,
   };
 })();
