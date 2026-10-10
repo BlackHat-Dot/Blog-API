@@ -1686,14 +1686,34 @@ STRICT EDITORIAL & TECHNICAL QUALITY STANDARDS:
    - Rich section headings (## and ###).
    - In-depth technical explanations with code snippets / SQL examples / configuration blocks where appropriate.
    - Bulleted insights, architectural trade-offs, and callout blockquotes (> quote).
-5. METADATA:
-   - Title: High-impact, engaging headline (min 5 characters).
-   - Summary: Compelling 1-2 sentence overview hooking the reader (min 10 characters).
-   - Category: Choose from [{categories_str}] or recommend a fitting category name.
-   - Tags: 3 to 5 relevant lowercase tags (e.g. ["postgres", "database", "performance"]).
+5. STRICT FIELD LENGTH LIMITS (MANDATORY):
+   - Title: Engaging headline (5 to 255 characters).
+   - Summary: Standfirst hooking the reader (10 to 1,000 characters).
+   - Category: Choose from [{categories_str}] or suggest a fitting name (1 to 50 characters).
+   - Tags: 3 to 6 lowercase tags, each 1 to 30 characters maximum (max 15 tags total).
+   - Body: In-depth markdown article (50 to 100,000 characters).
 """
             user_prompt = f"Topic / Depiction: {request.prompt}\nChosen Tone: {request.tone}"
             data = _generate_with_gemini(api_key, user_prompt, system_instruction, GeneratedPostResponse)
+
+            # Defensive sanitization ensuring limits are never breached
+            if "title" in data and isinstance(data["title"], str):
+                data["title"] = data["title"].strip()[:255]
+            if "summary" in data and isinstance(data["summary"], str):
+                data["summary"] = data["summary"].strip()[:1000]
+            if "body" in data and isinstance(data["body"], str):
+                data["body"] = data["body"][:100000]
+            if "category" in data and isinstance(data["category"], str):
+                data["category"] = data["category"].strip()[:50]
+            if "tags" in data and isinstance(data["tags"], list):
+                cleaned_tags = []
+                for t in data["tags"]:
+                    if isinstance(t, str):
+                        clean_t = re.sub(r"[^a-zA-Z0-9_-]", "", t.strip().lower())[:30]
+                        if clean_t and clean_t not in cleaned_tags:
+                            cleaned_tags.append(clean_t)
+                data["tags"] = cleaned_tags[:15]
+
             return GeneratedPostResponse(**data)
         except Exception as exc:
             logger.error("Gemini generate-post failed: %s", exc)
