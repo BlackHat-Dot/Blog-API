@@ -26,7 +26,7 @@
   }
 
   window.LONGHAND = {
-    appName: "Blog API",
+    appName: "Longhand",
     apiBase: base,
   };
 })();
