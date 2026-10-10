@@ -30,6 +30,24 @@
     },
   };
 
+  const GEMINI_KEY = 'longhand.gemini_key';
+  let _memGeminiKey = null;
+  const geminiKey = {
+    get() {
+      try {
+        const k = localStorage.getItem(GEMINI_KEY);
+        if (k) return k;
+      } catch { /* storage blocked */ }
+      return _memGeminiKey;
+    },
+    set(k) {
+      _memGeminiKey = k ? k.trim() : null;
+      try {
+        k ? localStorage.setItem(GEMINI_KEY, k.trim()) : localStorage.removeItem(GEMINI_KEY);
+      } catch { /* storage blocked */ }
+    },
+  };
+
   function detailText(d) {
     if (!d) return '';
     if (typeof d === 'string') return d;
@@ -101,8 +119,10 @@
     unbookmark: (id) => call('DELETE', `/posts/${id}/bookmark`),
     bookmarks: (q) => call('GET', '/bookmarks', { query: q }),
 
-    suggestTones: (prompt, apiKey) => call('POST', '/ai/suggest-tones', { body: { prompt, api_key: apiKey } }),
-    generatePost: (prompt, tone, existingCategories, apiKey) => call('POST', '/ai/generate-post', { body: { prompt, tone, existing_categories: existingCategories, api_key: apiKey } }),
+    getGeminiKey: () => geminiKey.get(),
+    setGeminiKey: (k) => geminiKey.set(k),
+    suggestTones: (prompt, apiKey) => call('POST', '/ai/suggest-tones', { body: { prompt, api_key: (apiKey !== undefined ? apiKey : geminiKey.get()) || null } }),
+    generatePost: (prompt, tone, existingCategories, apiKey) => call('POST', '/ai/generate-post', { body: { prompt, tone, existing_categories: existingCategories, api_key: (apiKey !== undefined ? apiKey : geminiKey.get()) || null } }),
 
     categories: () => call('GET', '/categories'),
     createCategory: (name) => call('POST', '/categories', { body: { name } }),
