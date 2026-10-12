@@ -16,6 +16,7 @@ A production-ready blog backend built with FastAPI, PostgreSQL, SQLAlchemy 2.0, 
 - Word count and read time calculation
 - Popular posts endpoint
 - Author profile with post count
+- Edit profile
 
 ## Tech stack
 
