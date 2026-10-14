@@ -18,6 +18,7 @@ A production-ready blog backend built with FastAPI, PostgreSQL, SQLAlchemy 2.0, 
 - Author profile with post count
 - Edit profile.
 
+
 ## Tech stack
 
 - FastAPI
